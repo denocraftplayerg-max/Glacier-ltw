@@ -202,7 +202,7 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar *const*string, co
     if(new_source == NULL) {
         new_source = optimize_shader(target_string, shader_info->shader_type, 460, current_context->shader_version);
         if(new_source != NULL) {
-            shader_cache_store(cache_key, new_source);
+            shader_cache_store(cache_key, new_source, target_string);
         }
     }
     if(shader_info->source != NULL) free((void*)shader_info->source);

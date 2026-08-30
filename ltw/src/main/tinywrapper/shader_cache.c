@@ -1,12 +1,17 @@
-/**
- * On-disk shader cache for LTW.
+/*
+ * LTW On-Disk Shader Cache
  *
- * Cache directory resolution order:
- *   1. $LTW_SHADER_CACHE_DIR  (if set)
- *   2. /data/local/tmp/ltw_shader_cache  (fallback)
+ * Stores converted ESSL sources to skip the shaderconv + glsl_optimizer
+ * pipeline on subsequent launches.
  *
- * Each entry is a flat file named  <fnv128>.essl  containing the
- * converted ESSL source text.
+ * Layout:
+ *   <base>/GLSL/<key>.glsl   - original GLSL from app (reference)
+ *   <base>/ESSL/<key>.essl   - converted ESSL (reused on next load)
+ *   <base>/Binary/           - reserved for future binary cache
+ *
+ * Base dir: $LTW_CACHE_DIR or /storage/emulated/0/Ltw/cache
+ *
+ * Cache key: FNV-1a 128-bit hash of (source + shader_type + version + cache_version)
  */
 #include "shader_cache.h"
 
@@ -15,17 +20,29 @@
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <errno.h>
 
-/* ── state ─────────────────────────────────────────────── */
-static char cache_dir[512]  = {0};
-static bool cache_enabled   = false;
-static bool cache_inited    = false;
+/* Bump this when shaderconv/optimizer algorithm changes.
+ * Old cache entries become automatic misses. */
+#define LTW_CACHE_VERSION 1
 
-/* ── helpers ───────────────────────────────────────────── */
-static void mkdirs(const char *path) {
-    char tmp[512];
+#define LTW_CACHE_BASE "/storage/emulated/0/Ltw/cache"
+
+/* ── internal state ────────────────────────────────── */
+static struct {
+    char base[512];
+    char glsl_dir[600];
+    char essl_dir[600];
+    int  enabled;
+    int  inited;
+    unsigned hits;
+    unsigned misses;
+    unsigned stores;
+} sc = {0};
+
+/* ── helpers ───────────────────────────────────────── */
+static void sc_mkdirs(const char *path) {
+    char tmp[600];
     strncpy(tmp, path, sizeof(tmp) - 1);
     tmp[sizeof(tmp) - 1] = '\0';
     for (char *p = tmp + 1; *p; p++) {
@@ -38,96 +55,151 @@ static void mkdirs(const char *path) {
     mkdir(tmp, 0755);
 }
 
-/* ── public API ────────────────────────────────────────── */
+/* ── init (auto-called when .so loads) ─────────────── */
 __attribute__((constructor))
 void shader_cache_init(void) {
-    if (cache_inited) return;
-    cache_inited = true;
+    if (sc.inited) return;
+    sc.inited = 1;
 
-    const char *dir = getenv("LTW_SHADER_CACHE_DIR");
-    if (dir == NULL || dir[0] == '\0') {
-        dir = "/data/local/tmp/ltw_shader_cache";
-    }
-    strncpy(cache_dir, dir, sizeof(cache_dir) - 1);
-    cache_dir[sizeof(cache_dir) - 1] = '\0';
+    const char *base = getenv("LTW_CACHE_DIR");
+    if (!base || !base[0]) base = LTW_CACHE_BASE;
 
-    mkdirs(cache_dir);
+    strncpy(sc.base, base, sizeof(sc.base) - 1);
+    sc.base[sizeof(sc.base) - 1] = '\0';
+    snprintf(sc.glsl_dir, sizeof(sc.glsl_dir), "%s/GLSL", base);
+    snprintf(sc.essl_dir, sizeof(sc.essl_dir), "%s/ESSL", base);
 
-    /* quick writability test */
-    char probe[600];
-    snprintf(probe, sizeof(probe), "%s/.probe", cache_dir);
+    /* Create all cache directories */
+    sc_mkdirs(sc.glsl_dir);
+    sc_mkdirs(sc.essl_dir);
+
+    /* Create binary dirs (reserved for future use) */
+    char bdir[700];
+    snprintf(bdir, sizeof(bdir), "%s/Binary/Resource_shader_extern", base);
+    sc_mkdirs(bdir);
+    snprintf(bdir, sizeof(bdir), "%s/Binary/minecraft_core", base);
+    sc_mkdirs(bdir);
+
+    /* Writability test */
+    char probe[700];
+    snprintf(probe, sizeof(probe), "%s/.probe", sc.essl_dir);
     FILE *f = fopen(probe, "w");
-    if (f == NULL) {
-        printf("LTWShaderCache: cannot write to %s — cache disabled\n", cache_dir);
-        cache_enabled = false;
+    if (!f) {
+        printf("LTWCache: DISABLED - cannot write to %s (%s)\n",
+               sc.essl_dir, strerror(errno));
+        sc.enabled = 0;
         return;
     }
     fclose(f);
     remove(probe);
 
-    cache_enabled = true;
-    printf("LTWShaderCache: enabled  dir=%s\n", cache_dir);
+    sc.enabled = 1;
+    printf("LTWCache: ENABLED (v%d)\n", LTW_CACHE_VERSION);
+    printf("LTWCache:   GLSL  -> %s\n", sc.glsl_dir);
+    printf("LTWCache:   ESSL  -> %s\n", sc.essl_dir);
 }
 
-bool shader_cache_is_enabled(void) { return cache_enabled; }
+int shader_cache_is_enabled(void) {
+    return sc.enabled;
+}
 
+/* ── hash ──────────────────────────────────────────── */
 void shader_cache_compute_key(char *out_key,
                               const char *source,
                               unsigned int shader_type,
                               int glsl_version) {
-    /* dual FNV-1a 64-bit → 128-bit hex key */
-    const uint64_t FNV_OFFSET = 14695981039346656037ULL;
-    const uint64_t FNV_PRIME  = 1099511628211ULL;
+    /*
+     * Dual FNV-1a 64-bit with different seeds -> 128-bit hex key.
+     * Collision probability effectively zero for any realistic
+     * number of shaders (< 2^32).
+     */
+    const uint64_t FNV_OFF = 14695981039346656037ULL;
+    const uint64_t FNV_P   = 1099511628211ULL;
 
-    uint64_t h1 = FNV_OFFSET;
-    uint64_t h2 = FNV_OFFSET;
+    uint64_t h1 = FNV_OFF;
+    uint64_t h2 = FNV_OFF ^ 0xFF51AFD7ED558CCDULL;
 
-    for (const char *p = source; *p; p++) {
-        uint64_t c = (uint64_t)(unsigned char)*p;
-        h1 ^= c;       h1 *= FNV_PRIME;
-        h2 ^= c + 0x9E; h2 *= FNV_PRIME;
+    for (const unsigned char *p = (const unsigned char *)source; *p; p++) {
+        h1 ^= *p; h1 *= FNV_P;
+        h2 ^= *p; h2 *= FNV_P;
     }
-    /* mix in stage + version */
-    h1 ^= (uint64_t)shader_type;  h1 *= FNV_PRIME;
-    h2 ^= (uint64_t)glsl_version;  h2 *= FNV_PRIME;
+
+    /* Mix in shader stage, ESSL version and cache version */
+    h1 ^= (uint64_t)shader_type;       h1 *= FNV_P;
+    h2 ^= (uint64_t)glsl_version;      h2 *= FNV_P;
+    h1 ^= (uint64_t)LTW_CACHE_VERSION; h1 *= FNV_P;
 
     snprintf(out_key, 64, "%016llx%016llx",
              (unsigned long long)h1,
              (unsigned long long)h2);
 }
 
+/* ── lookup ────────────────────────────────────────── */
 char *shader_cache_lookup(const char *key) {
-    if (!cache_enabled) return NULL;
+    if (!sc.enabled) return NULL;
 
-    char path[600];
-    snprintf(path, sizeof(path), "%s/%s.essl", cache_dir, key);
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s.essl", sc.essl_dir, key);
 
     FILE *f = fopen(path, "rb");
-    if (f == NULL) return NULL;
+    if (!f) {
+        sc.misses++;
+        return NULL;
+    }
 
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
-    if (sz <= 0) { fclose(f); return NULL; }
+    if (sz <= 0) {
+        fclose(f);
+        sc.misses++;
+        return NULL;
+    }
     fseek(f, 0, SEEK_SET);
 
     char *buf = (char *)malloc((size_t)sz + 1);
-    if (buf == NULL) { fclose(f); return NULL; }
+    if (!buf) {
+        fclose(f);
+        sc.misses++;
+        return NULL;
+    }
 
     size_t n = fread(buf, 1, (size_t)sz, f);
     buf[n] = '\0';
     fclose(f);
+
+    sc.hits++;
+    printf("LTWCache: HIT  %.16s.. (%u hits / %u total)\n",
+           key, sc.hits, sc.hits + sc.misses);
     return buf;
 }
 
-void shader_cache_store(const char *key, const char *essl_source) {
-    if (!cache_enabled || essl_source == NULL) return;
+/* ── store ─────────────────────────────────────────── */
+void shader_cache_store(const char *key,
+                        const char *essl_source,
+                        const char *glsl_original) {
+    if (!sc.enabled || !essl_source) return;
 
-    char path[600];
-    snprintf(path, sizeof(path), "%s/%s.essl", cache_dir, key);
+    char path[700];
+    FILE *f;
 
-    FILE *f = fopen(path, "wb");
-    if (f == NULL) return;
+    /* Save converted ESSL (this is what gets reused) */
+    snprintf(path, sizeof(path), "%s/%s.essl", sc.essl_dir, key);
+    f = fopen(path, "wb");
+    if (f) {
+        fwrite(essl_source, 1, strlen(essl_source), f);
+        fclose(f);
+    }
 
-    fwrite(essl_source, 1, strlen(essl_source), f);
-    fclose(f);
+    /* Save original GLSL (for debugging / reference) */
+    if (glsl_original) {
+        snprintf(path, sizeof(path), "%s/%s.glsl", sc.glsl_dir, key);
+        f = fopen(path, "wb");
+        if (f) {
+            fwrite(glsl_original, 1, strlen(glsl_original), f);
+            fclose(f);
+        }
+    }
+
+    sc.stores++;
+    printf("LTWCache: STORE %.16s.. (%u stored)\n", key, sc.stores);
 }
