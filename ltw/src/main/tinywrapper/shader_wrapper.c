@@ -13,6 +13,10 @@
 #include "string_utils.h"
 #include "egl.h"
 #include "proc.h"
+
+/* Cache statistics */
+static unsigned int shader_cache_hits = 0;
+static unsigned int shader_cache_misses = 0;
 #include "shader_cache.h"
 
 typedef struct {
@@ -23,7 +27,32 @@ typedef struct {
 typedef struct {
     GLuint frag_shader;
     GLchar* colorbindings[MAX_DRAWBUFFERS];
+    bool is_gui_text;
 } program_info_t;
+
+
+/**
+* Classifica se um shader é de GUI/texto (bloquear binário)
+* ou de mundo/terreno (permitir binário).
+* Heurística conservadora: se NÃO tem fog/light/normal, é GUI/texto.
+*/
+static bool classify_gui_text(const char* source) {
+    if (!source) return false;
+    /* Shaders de mundo têm fog, lighting ou normals */
+    if (strstr(source, "fog") || strstr(source, "Fog") ||
+        strstr(source, "Light") || strstr(source, "light") ||
+        strstr(source, "Normal") || strstr(source, "normal") ||
+        strstr(source, "Overlay") || strstr(source, "overlay")) {
+        return false; /* mundo → permite binário */
+    }
+    /* Shaders simples com textura/cor → provavelmente GUI/texto */
+    if (strstr(source, "Sampler") || strstr(source, "sampler") ||
+        strstr(source, "texture") || strstr(source, "Color") ||
+        strstr(source, "color")) {
+        return true; /* GUI/texto → bloquear binário */
+    }
+    return false; /* na dúvida, permite binário */
+}
 
 GLuint glCreateProgram(void) {
     if(!current_context) return 0;
@@ -99,6 +128,13 @@ void glLinkProgram(GLuint program) {
     if(program_info == NULL || program_info->frag_shader == 0) {
         // Don't have any fragment shader to patch the locations in, fall through.
         goto fallthrough;
+    }
+    /* Classificar programa: GUI/texto bloqueia binário */
+    {
+        shader_info_t* cls_shader = unordered_map_get(current_context->shader_map, (void*)program_info->frag_shader);
+        if(cls_shader && cls_shader->source) {
+            program_info->is_gui_text = classify_gui_text(cls_shader->source);
+        }
     }
     shader_info_t *shader = unordered_map_get(current_context->shader_map, (void*)program_info->frag_shader);
     if(shader == NULL) {
@@ -216,4 +252,38 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar *const*string, co
     es3_functions.glShaderSource(shader, 1, &shader_info->source, 0);
     end:
     free(target_string);
+}
+
+
+/* ═══════════════════════════════════════════
+ * Cache Binário com Filtro GUI/Texto
+ * GUI/Texto: NUNCA gerar binário (texto sempre renderiza)
+ * Mundo/Terreno: gerar binário (load instantâneo)
+ * ═══════════════════════════════════════════ */
+void glGetProgramBinary(GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, void *binary) {
+    if(!current_context) {
+        if(length) *length = 0;
+        return;
+    }
+    program_info_t* info = unordered_map_get(current_context->program_map, (void*)program);
+    if(info && info->is_gui_text) {
+        /* GUI/Texto: não gerar binário.
+         * O Minecraft vai recompilar do ESSL cacheado.
+         * Isso evita o bug de texto não renderizado. */
+        if(length) *length = 0;
+        if(binaryFormat) *binaryFormat = 0;
+        return;
+    }
+    /* Mundo/Terreno: gerar binário do driver */
+    es3_functions.glGetProgramBinary(program, bufSize, length, binaryFormat, binary);
+}
+
+void glProgramBinary(GLuint program, GLenum binaryFormat, const void *binary, GLsizei length) {
+    if(!current_context) return;
+    /* Encaminhar para o driver.
+     * Como filtramos GUI/Texto no glGetProgramBinary,
+     * o Minecraft não deve ter binários de GUI/Texto para carregar.
+     * Se um binário antigo de GUI/Texto existir (de versão anterior),
+     * limpe o cache de shaders do Minecraft. */
+    es3_functions.glProgramBinary(program, binaryFormat, binary, length);
 }
