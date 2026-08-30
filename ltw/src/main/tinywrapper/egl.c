@@ -8,6 +8,7 @@
 #include "string_utils.h"
 #include "env.h"
 #include <string.h>
+#include "gpu_culling.h"
 
 thread_local context_t *current_context;
 unordered_map* context_map;

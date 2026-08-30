@@ -18,68 +18,61 @@ static struct {
 } gpu = {0};
 
 /* Compute shader embutido (GLSL ES 3.10) */
-static const char* computeShaderSource = R"(#version 310 es
-layout(local_size_x = 64) in;
-
-struct DrawMetadata {
-    vec4 position;        // xyz = posição, w = padding
-    uint indexCount;
-    uint baseVertex;
-    uint firstIndex;
-    uint visible;
-};
-
-struct IndirectCommand {
-    uint count;
-    uint instanceCount;
-    uint firstIndex;
-    uint baseVertex;
-    uint baseInstance;
-};
-
-layout(std430, binding = 0) readonly buffer InMetadata {
-    DrawMetadata draws[];
-};
-
-layout(std430, binding = 1) buffer OutCommand {
-    IndirectCommand cmd;
-};
-
-uniform vec4 u_FrustumPlanes[6];
-uniform int u_NumDraws;
-
-void main() {
-    uint id = gl_GlobalInvocationID.x;
-    if (id >= uint(u_NumDraws)) return;
-    
-    DrawMetadata draw = draws[id];
-    if (draw.indexCount == 0u) return;
-    
-    // AABB do draw (assumindo tamanho padrão de chunk: 16x16x16)
-    vec3 minBox = draw.position.xyz;
-    vec3 maxBox = draw.position.xyz + vec3(16.0, 16.0, 16.0);
-    
-    // Frustum culling: testa contra os 6 planos
-    bool visible = true;
-    for (int i = 0; i < 6; i++) {
-        vec4 plane = u_FrustumPlanes[i];
-        vec3 p = vec3(
-            plane.x >= 0.0 ? maxBox.x : minBox.x,
-            plane.y >= 0.0 ? maxBox.y : minBox.y,
-            plane.z >= 0.0 ? maxBox.z : minBox.z
-        );
-        if (dot(plane.xyz, p) + plane.w < 0.0) {
-            visible = false;
-            break;
-        }
-    }
-    
-    if (visible) {
-        // Operação atómica para adicionar índices ao comando indirect
-        atomicAdd(cmd.count, draw.indexCount);
-    }
-}
-)";
+static const char* computeShaderSource =
+    "#version 310 es\n"
+    "layout(local_size_x = 64) in;\n"
+    "\n"
+    "struct DrawMetadata {\n"
+    "    vec4 position;\n"
+    "    uint indexCount;\n"
+    "    uint baseVertex;\n"
+    "    uint firstIndex;\n"
+    "    uint visible;\n"
+    "};\n"
+    "\n"
+    "struct IndirectCommand {\n"
+    "    uint count;\n"
+    "    uint instanceCount;\n"
+    "    uint firstIndex;\n"
+    "    uint baseVertex;\n"
+    "    uint baseInstance;\n"
+    "};\n"
+    "\n"
+    "layout(std430, binding = 0) readonly buffer InMetadata {\n"
+    "    DrawMetadata draws[];\n"
+    "};\n"
+    "\n"
+    "layout(std430, binding = 1) buffer OutCommand {\n"
+    "    IndirectCommand cmd;\n"
+    "};\n"
+    "\n"
+    "uniform vec4 u_FrustumPlanes[6];\n"
+    "uniform int u_NumDraws;\n"
+    "\n"
+    "void main() {\n"
+    "    uint id = gl_GlobalInvocationID.x;\n"
+    "    if (id >= uint(u_NumDraws)) return;\n"
+    "    DrawMetadata draw = draws[id];\n"
+    "    if (draw.indexCount == 0u) return;\n"
+    "    vec3 minBox = draw.position.xyz;\n"
+    "    vec3 maxBox = draw.position.xyz + vec3(16.0, 16.0, 16.0);\n"
+    "    bool visible = true;\n"
+    "    for (int i = 0; i < 6; i++) {\n"
+    "        vec4 plane = u_FrustumPlanes[i];\n"
+    "        vec3 p = vec3(\n"
+    "            plane.x >= 0.0 ? maxBox.x : minBox.x,\n"
+    "            plane.y >= 0.0 ? maxBox.y : minBox.y,\n"
+    "            plane.z >= 0.0 ? maxBox.z : minBox.z\n"
+    "        );\n"
+    "        if (dot(plane.xyz, p) + plane.w < 0.0) {\n"
+    "            visible = false;\n"
+    "            break;\n"
+    "        }\n"
+    "    }\n"
+    "    if (visible) {\n"
+    "        atomicAdd(cmd.count, draw.indexCount);\n"
+    "    }\n"
+    "}\n";
 
 static GLuint compileComputeShader(void) {
     GLuint shader = es3_functions.glCreateShader(GL_COMPUTE_SHADER);
