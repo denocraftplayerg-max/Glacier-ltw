@@ -1,6 +1,9 @@
 #ifndef LTW_SHADER_CACHE_H
 #define LTW_SHADER_CACHE_H
 
+#include <stdbool.h>
+#include <GLES3/gl3.h>
+
 void shader_cache_init(void);
 
 void shader_cache_compute_key(char *out_key,

@@ -376,14 +376,14 @@ static basebuffer_binding_t* set_basebuffer(GLenum target, GLuint index, GLuint 
     int buffer_mapindex = get_base_buffer_index(target);
     if(buffer_mapindex == -1) return NULL;
     if(!buffer) {
-        basebuffer_binding_t *old_binding = unordered_map_remove(current_context->bound_basebuffers[buffer_mapindex], (void*)index);
+        basebuffer_binding_t *old_binding = unordered_map_remove(current_context->bound_basebuffers[buffer_mapindex], (void*)(uintptr_t)index);
         free(old_binding);
         return NULL;
     }else {
-        basebuffer_binding_t *binding = unordered_map_get(current_context->bound_basebuffers[buffer_mapindex], (void*)index);
+        basebuffer_binding_t *binding = unordered_map_get(current_context->bound_basebuffers[buffer_mapindex], (void*)(uintptr_t)index);
         if(binding == NULL) {
             binding = calloc(1, sizeof(basebuffer_binding_t));
-            unordered_map_put(current_context->bound_basebuffers[buffer_mapindex], (void*)index, binding);
+            unordered_map_put(current_context->bound_basebuffers[buffer_mapindex], (void*)(uintptr_t)index, binding);
         }
         binding->index = index;
         binding->buffer = buffer;
