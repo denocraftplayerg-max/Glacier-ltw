@@ -74,7 +74,6 @@ eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname) {
     if(strncmp(procname, "gl", 2) != 0) goto fallback;
 #define GLESOVERRIDE(name)                                        \
     if(!strcmp(procname, #name)) {                                \
-        printf("LTW: Overridden %s\n", #name);                        \
         return (eglMustCastToProperFunctionPointerType) name;     \
     }
 #include "es3_overrides.h"

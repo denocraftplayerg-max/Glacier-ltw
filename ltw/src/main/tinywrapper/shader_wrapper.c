@@ -129,7 +129,6 @@ void glLinkProgram(GLuint program) {
     }
     es3_functions.glShaderSource(patched_shader, 1, &const_source, NULL);
     es3_functions.glCompileShader(patched_shader);
-    free(new_source);
     GLint compileStatus;
     es3_functions.glGetShaderiv(patched_shader, GL_COMPILE_STATUS, &compileStatus);
     if(compileStatus != GL_TRUE) {
@@ -138,6 +137,7 @@ void glLinkProgram(GLuint program) {
         GLchar log[logSize];
         es3_functions.glGetShaderInfoLog(patched_shader, logSize, NULL, log);
         printf("LTWShdrWp: failed to compile patched fragment shader, using default. Log:\n\n%s\n\nShader content:\n\n%s\n\n", log, const_source);
+        free(new_source);
         goto fallthrough;
     }
     es3_functions.glDetachShader(program, program_info->frag_shader);

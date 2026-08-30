@@ -60,6 +60,12 @@ static bool init_context(context_t* tw_context) {
 }
 
 static void free_context(context_t* tw_context) {
+    for(int i = 0; i < MAX_BOUND_BASEBUFFERS; i++) {
+        if(tw_context->bound_basebuffers[i]) {
+            unordered_map_free(tw_context->bound_basebuffers[i]);
+            tw_context->bound_basebuffers[i] = NULL;
+        }
+    }
     unordered_map_free(tw_context->shader_map);
     unordered_map_free(tw_context->program_map);
     unordered_map_free(tw_context->framebuffer_map);

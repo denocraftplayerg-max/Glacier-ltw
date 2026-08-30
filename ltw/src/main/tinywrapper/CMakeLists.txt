@@ -9,6 +9,7 @@ add_subdirectory(unordered_map)
 add_subdirectory(vgpu_shaderconv)
 add_subdirectory(glsl_optimizer)
 
+target_compile_options(ltw PRIVATE -O3 -DNDEBUG -fvisibility=hidden -ffunction-sections -fdata-sections -flto)
 target_link_options(ltw PUBLIC  -Wl,--version-script=${CMAKE_SOURCE_DIR}/version.script -ffunction-sections -fdata-sections -flto -Wl,--gc-sections)
 target_link_libraries(ltw unordered_map vgpu_shaderconv glsl_optimizer)
 if(ANDROID)
