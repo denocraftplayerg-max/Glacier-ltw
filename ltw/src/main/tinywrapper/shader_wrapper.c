@@ -13,6 +13,7 @@
 #include "string_utils.h"
 #include "egl.h"
 #include "proc.h"
+#include "shader_cache.h"
 
 typedef struct {
     GLenum shader_type;
@@ -120,6 +121,9 @@ void glLinkProgram(GLuint program) {
     }else {
         //printf("\n\n\nShader Result POST PATCH\n%s\n\n\n", new_source);
     }
+    /* cache the location-patched fragment source */
+    char link_cache_key[64];
+    shader_cache_compute_key(link_cache_key, new_source, GL_FRAGMENT_SHADER, current_context->shader_version);
     const GLchar* const_source = (const GLchar*)new_source;
     GLuint patched_shader = es3_functions.glCreateShader(GL_FRAGMENT_SHADER);
     if(patched_shader == 0) {
@@ -192,7 +196,15 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar *const*string, co
     target_string[target_length] = 0;
 
 #undef SRC_LEN
-    GLchar* new_source = optimize_shader(target_string, shader_info->shader_type, 460, current_context->shader_version);
+    char cache_key[64];
+    shader_cache_compute_key(cache_key, target_string, shader_info->shader_type, current_context->shader_version);
+    GLchar* new_source = shader_cache_lookup(cache_key);
+    if(new_source == NULL) {
+        new_source = optimize_shader(target_string, shader_info->shader_type, 460, current_context->shader_version);
+        if(new_source != NULL) {
+            shader_cache_store(cache_key, new_source);
+        }
+    }
     if(shader_info->source != NULL) free((void*)shader_info->source);
     if(!new_source) {
         printf("LTWShdrWp: failed to convert&optimize shader %u, skipping\n", shader);
