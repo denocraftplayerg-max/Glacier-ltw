@@ -123,6 +123,65 @@ static void insert_fragout_pos(char* source, int* size, const char* name, GLuint
     gl4es_inplace_replace_simple(source, size, src_string, dst_string);
 }
 
+
+/**
+ * Fase 2: Computa hash único do programa combinando
+ * o hash do fragment shader + colorbindings.
+ * Usado como chave do cache binário.
+ */
+static void ltw_compute_program_hash(program_info_t* info, char* out_key) {
+    out_key[0] = '\0';
+    if (!info || !current_context) return;
+    shader_info_t* frag = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)info->frag_shader);
+    if (!frag || !frag->source) return;
+
+    char frag_key[64];
+    shader_cache_compute_key(frag_key, frag->source, GL_FRAGMENT_SHADER, current_context->shader_version);
+
+    char combined[8192];
+    snprintf(combined, sizeof(combined), "%s", frag_key);
+    for (int i = 0; i < MAX_DRAWBUFFERS; i++) {
+        if (info->colorbindings[i]) {
+            strncat(combined, info->colorbindings[i], sizeof(combined) - strlen(combined) - 1);
+            strncat(combined, "|", sizeof(combined) - strlen(combined) - 1);
+        }
+    }
+    shader_cache_compute_key(out_key, combined, GL_FRAGMENT_SHADER, current_context->shader_version);
+}
+
+/**
+ * Fase 2: Após link bem-sucedido, salva o binário do driver
+ * em /Ltw/cache/Binary/ se o programa não for GUI/Text.
+ */
+static void ltw_post_link_save(GLuint program, program_info_t* info) {
+    if (!current_context || !info || info->is_gui_text) return;
+
+    GLint link_status = GL_FALSE;
+    es3_functions.glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+    if (link_status != GL_TRUE) return;
+
+    char prog_hash[64];
+    ltw_compute_program_hash(info, prog_hash);
+    if (prog_hash[0] == '\0') return;
+
+    GLint bin_length = 0;
+    es3_functions.glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &bin_length);
+    if (bin_length <= 0) return;
+
+    void* binary = malloc(bin_length);
+    if (!binary) return;
+
+    GLenum bin_format = 0;
+    GLsizei actual_len = 0;
+    es3_functions.glGetProgramBinary(program, bin_length, &actual_len, &bin_format, binary);
+
+    if (actual_len > 0) {
+        shader_cache_save_binary(prog_hash, bin_format, binary, actual_len);
+        printf("LTWBinCache: STORE %s (%d bytes)\n", prog_hash, actual_len);
+    }
+    free(binary);
+}
+
 void glLinkProgram(GLuint program) {
     if(!current_context) return;
     program_info_t* program_info = unordered_map_get(current_context->program_map, (void*)(uintptr_t)program);
@@ -135,6 +194,28 @@ void glLinkProgram(GLuint program) {
         shader_info_t* cls_shader = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)program_info->frag_shader);
         if(cls_shader && cls_shader->source) {
             program_info->is_gui_text = classify_gui_text(cls_shader->source);
+        }
+    }
+    /* Fase 2: tentar carregar binário do cache LTW */
+    if(!program_info->is_gui_text) {
+        char prog_hash[64];
+        ltw_compute_program_hash(program_info, prog_hash);
+        if(prog_hash[0] != '\0') {
+            GLenum bin_format = 0;
+            void* bin_data = NULL;
+            GLint bin_len = 0;
+            if(shader_cache_load_binary(prog_hash, &bin_format, &bin_data, &bin_len)) {
+                es3_functions.glProgramBinary(program, bin_format, bin_data, bin_len);
+                free(bin_data);
+                GLint link_status = GL_FALSE;
+                es3_functions.glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+                if(link_status == GL_TRUE) {
+                    printf("LTWBinCache: HIT %s\n", prog_hash);
+                    return;
+                }
+                shader_cache_invalidate_binary(prog_hash);
+                printf("LTWBinCache: STALE %s, relinking\n", prog_hash);
+            }
         }
     }
     shader_info_t *shader = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)program_info->frag_shader);
@@ -184,10 +265,12 @@ void glLinkProgram(GLuint program) {
     es3_functions.glDetachShader(program, program_info->frag_shader);
     es3_functions.glAttachShader(program, patched_shader);
     es3_functions.glLinkProgram(program);
+    ltw_post_link_save(program, program_info);
     es3_functions.glDeleteShader(patched_shader);
     return;
     fallthrough:
     es3_functions.glLinkProgram(program);
+    ltw_post_link_save(program, program_info);
 }
 
 GLuint glCreateShader(GLenum shaderType) {

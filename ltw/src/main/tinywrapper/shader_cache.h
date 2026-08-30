@@ -16,4 +16,8 @@ void shader_cache_store(const char *key,
 
 int shader_cache_is_enabled(void);
 
+bool shader_cache_load_binary(const char* key, GLenum* out_format, void** out_binary, GLint* out_length);
+void shader_cache_save_binary(const char* key, GLenum format, const void* binary, GLint length);
+void shader_cache_invalidate_binary(const char* key);
+
 #endif

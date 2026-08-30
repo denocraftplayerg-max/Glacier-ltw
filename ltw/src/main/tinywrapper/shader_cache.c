@@ -33,6 +33,7 @@ static struct {
     char base[512];
     char glsl_dir[600];
     char essl_dir[600];
+    char bin_dir[600];
     int  enabled;
     int  inited;
     unsigned hits;
@@ -68,10 +69,12 @@ void shader_cache_init(void) {
     sc.base[sizeof(sc.base) - 1] = '\0';
     snprintf(sc.glsl_dir, sizeof(sc.glsl_dir), "%s/GLSL", base);
     snprintf(sc.essl_dir, sizeof(sc.essl_dir), "%s/ESSL", base);
+    snprintf(sc.bin_dir, sizeof(sc.bin_dir), "%s/Binary", base);
 
     /* Create all cache directories */
     sc_mkdirs(sc.glsl_dir);
     sc_mkdirs(sc.essl_dir);
+    sc_mkdirs(sc.bin_dir);
 
     /* Create binary dirs (reserved for future use) */
     char bdir[700];
@@ -202,4 +205,60 @@ void shader_cache_store(const char *key,
 
     sc.stores++;
     printf("LTWCache: STORE %.16s.. (%u stored)\n", key, sc.stores);
+}
+
+
+/* ═══════════════════════════════════════════
+ * Fase 2: Cache Binário do Driver GLES
+ * Formato do arquivo: [GLenum format][GLint length][binary data]
+ * ═══════════════════════════════════════════ */
+bool shader_cache_load_binary(const char* key, GLenum* out_format, void** out_binary, GLint* out_length) {
+    if (!sc.enabled || !key || key[0] == '\0') return false;
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s.bin", sc.bin_dir, key);
+    FILE* f = fopen(path, "rb");
+    if (!f) return false;
+
+    GLenum format = 0;
+    GLint length = 0;
+    if (fread(&format, sizeof(GLenum), 1, f) != 1 ||
+        fread(&length, sizeof(GLint), 1, f) != 1 ||
+        length <= 0) {
+        fclose(f);
+        return false;
+    }
+
+    void* data = malloc(length);
+    if (!data) { fclose(f); return false; }
+
+    if (fread(data, 1, length, f) != (size_t)length) {
+        free(data);
+        fclose(f);
+        return false;
+    }
+    fclose(f);
+
+    *out_format = format;
+    *out_binary = data;
+    *out_length = length;
+    return true;
+}
+
+void shader_cache_save_binary(const char* key, GLenum format, const void* binary, GLint length) {
+    if (!sc.enabled || !key || key[0] == '\0' || !binary || length <= 0) return;
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s.bin", sc.bin_dir, key);
+    FILE* f = fopen(path, "wb");
+    if (!f) return;
+    fwrite(&format, sizeof(GLenum), 1, f);
+    fwrite(&length, sizeof(GLint), 1, f);
+    fwrite(binary, 1, length, f);
+    fclose(f);
+}
+
+void shader_cache_invalidate_binary(const char* key) {
+    if (!key || key[0] == '\0') return;
+    char path[700];
+    snprintf(path, sizeof(path), "%s/%s.bin", sc.bin_dir, key);
+    remove(path);
 }
