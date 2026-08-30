@@ -39,4 +39,9 @@ GLuint gpu_culling_get_indirect_buffer(void);
 /* Limpa todos os draws registados (chamar no início de cada frame) */
 void gpu_culling_clear(void);
 
+/* Regista draw com posição conhecida */
+void gpu_culling_register_draw_with_pos(float x, float y, float z,
+                                         uint32_t indexCount, uint32_t baseVertex,
+                                         uint32_t firstIndex);
+
 #endif

@@ -408,6 +408,8 @@ LOCAL_SRC_FILES := \
     license_notice.c \
     env.c \
 shader_cache.c \
+gpu_culling.c \
+jni_bridge.c \
     vgpu_shaderconv/shaderconv.c \
     unordered_map/unordered_map.c \
     unordered_map/int_hash.c

@@ -9,6 +9,7 @@
 #include "egl.h"
 #include "main.h"
 #include "gpu_culling.h"
+#include "jni_bridge.h"
 
 typedef struct {
     GLuint count;
@@ -129,16 +130,31 @@ void glMultiDrawElementsBaseVertex(GLenum mode,
         // Regista todos os draws no sistema de culling
         for(GLsizei i = 0; i < drawcount; i++) {
             indirect_pass_t* pass = &indirect_passes[i];
-            // TODO: obter posição real do chunk/draw aqui
-            gpu_culling_register_draw(0.0f, 0.0f, 0.0f,
-                                      pass->count, pass->baseVertex,
-                                      pass->firstIndex);
+            
+            // Tentar obter posição do chunk via JNI bridge
+            float cx, cy, cz;
+            if(ltw_get_chunk_position(pass->baseVertex, &cx, &cy, &cz)) {
+                // Posição conhecida: culling preciso
+                gpu_culling_register_draw_with_pos(cx, cy, cz,
+                                                   pass->count, pass->baseVertex,
+                                                   pass->firstIndex);
+            } else {
+                // Posição desconhecida: assumir visível (sem culling)
+                gpu_culling_register_draw(0.0f, 0.0f, 0.0f,
+                                          pass->count, pass->baseVertex,
+                                          pass->firstIndex);
+            }
         }
         
         // Executa compute shader com frustum planes da câmera atual
         // TODO: obter frustum planes do contexto atual
-        float dummyPlanes[24] = {0}; // Placeholder
-        gpu_culling_execute(dummyPlanes, 6);
+        // Executa compute shader com frustum planes
+        if(ltw_has_frustum_planes()) {
+            gpu_culling_execute(NULL, 0);
+        } else {
+            float dummyPlanes[24] = {0};
+            gpu_culling_execute(dummyPlanes, 6);
+        }
         
         // Draw único com comando indirect atualizado pela GPU
         es3_functions.glDrawElementsIndirect(mode, type, 0);

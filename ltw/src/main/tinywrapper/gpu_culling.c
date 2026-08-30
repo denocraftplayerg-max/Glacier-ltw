@@ -208,3 +208,20 @@ GLuint gpu_culling_get_indirect_buffer(void) {
 void gpu_culling_clear(void) {
     gpu.numDraws = 0;
 }
+
+void gpu_culling_register_draw_with_pos(float x, float y, float z,
+                                         uint32_t indexCount, uint32_t baseVertex,
+                                         uint32_t firstIndex) {
+    if (!gpu.initialized || gpu.numDraws >= MAX_DRAWS) return;
+    
+    DrawMetadata* meta = &gpu.metadata[gpu.numDraws];
+    meta->posX = x;
+    meta->posY = y;
+    meta->posZ = z;
+    meta->indexCount = indexCount;
+    meta->baseVertex = baseVertex;
+    meta->firstIndex = firstIndex;
+    meta->visible = 0;
+    
+    gpu.numDraws++;
+}
