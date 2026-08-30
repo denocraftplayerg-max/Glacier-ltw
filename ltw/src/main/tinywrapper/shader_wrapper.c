@@ -5,6 +5,7 @@
  */
 
 #include "unordered_map/unordered_map.h"
+#include <stdint.h>
 #include "vgpu_shaderconv/shaderconv.h"
 #include "glsl_optimizer/src/code/c_wrapper.h"
 #include <GLES3/gl3.h>
@@ -63,14 +64,14 @@ GLuint glCreateProgram(void) {
         printf("LTWShdrWp: failed to allocate program_info\n");
         abort();
     }
-    unordered_map_put(current_context->program_map, (void*)phys_program, prog_info);
+    unordered_map_put(current_context->program_map, (void*)(uintptr_t)phys_program, prog_info);
     return phys_program;
 }
 
 void glDeleteProgram(GLuint program) {
     if(!current_context) return;
     es3_functions.glDeleteProgram(program);
-    program_info_t *old_programinfo = unordered_map_remove(current_context->program_map, (void*)program);
+    program_info_t *old_programinfo = unordered_map_remove(current_context->program_map, (void*)(uintptr_t)program);
     if(old_programinfo == NULL) return;
     for(GLuint i = 0; i < MAX_DRAWBUFFERS; i++) {
         const GLchar* binding = old_programinfo->colorbindings[i];
@@ -83,8 +84,8 @@ void glAttachShader( 	GLuint program,
                         GLuint shader) {
     if(!current_context) return;
     es3_functions.glAttachShader(program, shader);
-    program_info_t* program_info = unordered_map_get(current_context->program_map, (void*)program);
-    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)shader);
+    program_info_t* program_info = unordered_map_get(current_context->program_map, (void*)(uintptr_t)program);
+    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)shader);
     if(program_info == NULL || shader_info == NULL || shader_info->shader_type != GL_FRAGMENT_SHADER) return;
     program_info->frag_shader = shader;
 }
@@ -93,7 +94,7 @@ void glBindFragDataLocation( 	GLuint program,
                                 GLuint colorNumber,
                                 const char * name) {
     if(!current_context) return;
-    program_info_t *program_info = unordered_map_get(current_context->program_map, (void*)program);
+    program_info_t *program_info = unordered_map_get(current_context->program_map, (void*)(uintptr_t)program);
     if(program_info == NULL || colorNumber >= MAX_DRAWBUFFERS) return;
     // Insert binding name at the specific index
     GLchar** pname = &program_info->colorbindings[colorNumber];
@@ -104,7 +105,7 @@ void glBindFragDataLocation( 	GLuint program,
 
 void glGetShaderiv(GLuint shader, GLuint pname, GLint* params) {
     if(!current_context) return;
-    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)shader);
+    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)shader);
     if(shader_info != NULL && shader_info->shader_type == GL_FRAGMENT_SHADER && pname == GL_COMPILE_STATUS) {
         // HACK: ignore compile results for frag shaders, as some drivers may not compile them without explicit fragouts
         // (which we add at link-time)
@@ -124,19 +125,19 @@ static void insert_fragout_pos(char* source, int* size, const char* name, GLuint
 
 void glLinkProgram(GLuint program) {
     if(!current_context) return;
-    program_info_t* program_info = unordered_map_get(current_context->program_map, (void*)program);
+    program_info_t* program_info = unordered_map_get(current_context->program_map, (void*)(uintptr_t)program);
     if(program_info == NULL || program_info->frag_shader == 0) {
         // Don't have any fragment shader to patch the locations in, fall through.
         goto fallthrough;
     }
     /* Classificar programa: GUI/texto bloqueia binário */
     {
-        shader_info_t* cls_shader = unordered_map_get(current_context->shader_map, (void*)program_info->frag_shader);
+        shader_info_t* cls_shader = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)program_info->frag_shader);
         if(cls_shader && cls_shader->source) {
             program_info->is_gui_text = classify_gui_text(cls_shader->source);
         }
     }
-    shader_info_t *shader = unordered_map_get(current_context->shader_map, (void*)program_info->frag_shader);
+    shader_info_t *shader = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)program_info->frag_shader);
     if(shader == NULL) {
         printf("LTWShdrWp: failed to patch frag data location due to missing shader info\n");
         goto fallthrough;
@@ -199,14 +200,14 @@ GLuint glCreateShader(GLenum shaderType) {
         abort();
     }
     info_struct->shader_type = shaderType;
-    unordered_map_put(current_context->shader_map, (void*)phys_shader, info_struct);
+    unordered_map_put(current_context->shader_map, (void*)(uintptr_t)phys_shader, info_struct);
     return phys_shader;
 }
 
 void glDeleteShader(GLuint shader) {
     if(!current_context) return;
     es3_functions.glDeleteShader(shader);
-    shader_info_t * old_shaderinfo = unordered_map_remove(current_context->shader_map, (void*)shader);
+    shader_info_t * old_shaderinfo = unordered_map_remove(current_context->shader_map, (void*)(uintptr_t)shader);
     if(old_shaderinfo == NULL) return;
     if(old_shaderinfo->source != NULL) free((void*)old_shaderinfo->source);
     free(old_shaderinfo);
@@ -214,7 +215,7 @@ void glDeleteShader(GLuint shader) {
 
 void glShaderSource(GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length) {
     if(!current_context) return;
-    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)shader);
+    shader_info_t* shader_info = unordered_map_get(current_context->shader_map, (void*)(uintptr_t)shader);
     if(shader_info == NULL) {
         printf("LTWShdrWp: shader_info missing for shader %u\n", shader);
         es3_functions.glShaderSource(shader, count, string, length);
@@ -241,7 +242,7 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar *const*string, co
             shader_cache_store(cache_key, new_source, target_string);
         }
     }
-    if(shader_info->source != NULL) free((void*)shader_info->source);
+    if(shader_info->source != NULL) free((void*)(uintptr_t)shader_info->source);
     if(!new_source) {
         printf("LTWShdrWp: failed to convert&optimize shader %u, skipping\n", shader);
         goto end;
@@ -265,7 +266,7 @@ void glGetProgramBinary(GLuint program, GLsizei bufSize, GLsizei *length, GLenum
         if(length) *length = 0;
         return;
     }
-    program_info_t* info = unordered_map_get(current_context->program_map, (void*)program);
+    program_info_t* info = unordered_map_get(current_context->program_map, (void*)(uintptr_t)program);
     if(info && info->is_gui_text) {
         /* GUI/Texto: não gerar binário.
          * O Minecraft vai recompilar do ESSL cacheado.

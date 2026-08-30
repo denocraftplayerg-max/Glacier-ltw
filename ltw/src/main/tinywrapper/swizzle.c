@@ -5,6 +5,7 @@
  */
 
 #include "proc.h"
+#include <stdint.h>
 #include "egl.h"
 #include <string.h>
 #include "libraryinternal.h"
@@ -33,14 +34,14 @@ static texture_swizzle_track_t* get_swizzle_track(GLenum target) {
     GLenum getter = get_textarget_query_param(target);
     if(getter == 0) return NULL;
     es3_functions.glGetIntegerv(getter, &texture);
-    texture_swizzle_track_t* track = unordered_map_get(current_context->texture_swztrack_map, (void*)texture);
+    texture_swizzle_track_t* track = unordered_map_get(current_context->texture_swztrack_map, (void*)(uintptr_t)texture);
     if(track == NULL) {
         track = malloc(sizeof(texture_swizzle_track_t));
         es3_functions.glGetTexParameteriv(target, GL_TEXTURE_SWIZZLE_R, (GLint*)&track->original_swizzle[0]);
         es3_functions.glGetTexParameteriv(target, GL_TEXTURE_SWIZZLE_G, (GLint*)&track->original_swizzle[1]);
         es3_functions.glGetTexParameteriv(target, GL_TEXTURE_SWIZZLE_B, (GLint*)&track->original_swizzle[2]);
         es3_functions.glGetTexParameteriv(target, GL_TEXTURE_SWIZZLE_A, (GLint*)&track->original_swizzle[3]);
-        unordered_map_put(current_context->texture_swztrack_map, (void*)texture, track);
+        unordered_map_put(current_context->texture_swztrack_map, (void*)(uintptr_t)texture, track);
     }
     return track;
 }

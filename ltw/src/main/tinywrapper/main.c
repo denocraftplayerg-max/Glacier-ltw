@@ -4,6 +4,7 @@
  * For use under LGPL-3.0
  */
 #include <stdio.h>
+#include <stdint.h>
 #include <dlfcn.h>
 
 #include <stdbool.h>
@@ -457,7 +458,7 @@ void glDeleteTextures(GLsizei n, const GLuint *textures) {
     if(!current_context) return;
     es3_functions.glDeleteTextures(n, textures);
     for(int i = 0; i < n; i++) {
-        void* tracker = unordered_map_remove(current_context->texture_swztrack_map, (void*)textures[i]);
+        void* tracker = unordered_map_remove(current_context->texture_swztrack_map, (void*)(uintptr_t)textures[i]);
         free(tracker);
     }
 }

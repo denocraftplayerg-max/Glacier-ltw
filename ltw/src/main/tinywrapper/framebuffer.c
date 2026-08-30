@@ -5,6 +5,7 @@
  */
 
 #include "proc.h"
+#include <stdint.h>
 #include "egl.h"
 #include <string.h>
 #include <stdio.h>
@@ -16,7 +17,7 @@ static framebuffer_t* get_framebuffer(GLenum target) {
         case GL_DRAW_FRAMEBUFFER: fb = current_context->draw_framebuffer; break;
         case GL_READ_FRAMEBUFFER: fb = current_context->read_framebuffer; break;
     }
-    return unordered_map_get(current_context->framebuffer_map, (void*)fb);
+    return unordered_map_get(current_context->framebuffer_map, (void*)(uintptr_t)fb);
 }
 
 static GLuint get_attachment_idx(GLenum attachment) {
@@ -269,7 +270,7 @@ void glGenFramebuffers(GLsizei n, GLuint* framebuffers) {
         fb = calloc(1, sizeof(framebuffer_t));
         fb->nbuffers = 1;
         fb->virt_drawbuffers[0] = GL_COLOR_ATTACHMENT0;
-        unordered_map_put(current_context->framebuffer_map, (void*)framebuffers[i], fb);
+        unordered_map_put(current_context->framebuffer_map, (void*)(uintptr_t)framebuffers[i], fb);
     }
 }
 
@@ -278,7 +279,7 @@ void glDeleteFramebuffers(GLsizei n, const GLuint* framebuffers) {
     es3_functions.glDeleteFramebuffers(n, framebuffers);
     framebuffer_t* fb;
     for(GLsizei i = 0; i < n; i++) {
-        fb = unordered_map_remove(current_context->framebuffer_map, (void*)framebuffers[i]);
+        fb = unordered_map_remove(current_context->framebuffer_map, (void*)(uintptr_t)framebuffers[i]);
         if(fb == NULL) continue;
         free(fb);
     }
