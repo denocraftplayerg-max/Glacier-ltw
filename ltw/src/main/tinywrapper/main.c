@@ -519,3 +519,64 @@ void glDebugMessageControl( 	GLenum source,
                                GLboolean enabled) {
     //STUB
 }
+
+
+/* ═══════════════════════════════════════════
+ * Forwarding de funções Compute Shader (GLES 3.1+)
+ * ═══════════════════════════════════════════ */
+
+void glDispatchCompute(GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z) {
+    if(!current_context) return;
+    if(es3_functions.glDispatchCompute) {
+        es3_functions.glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
+    }
+}
+
+void glDispatchComputeIndirect(GLintptr indirect) {
+    if(!current_context) return;
+    if(es3_functions.glDispatchComputeIndirect) {
+        es3_functions.glDispatchComputeIndirect(indirect);
+    }
+}
+
+void glMemoryBarrier(GLbitfield barriers) {
+    if(!current_context) return;
+    if(es3_functions.glMemoryBarrier) {
+        es3_functions.glMemoryBarrier(barriers);
+    }
+}
+
+void glMemoryBarrierByRegion(GLbitfield barriers) {
+    if(!current_context) return;
+    if(es3_functions.glMemoryBarrierByRegion) {
+        es3_functions.glMemoryBarrierByRegion(barriers);
+    }
+}
+
+void glShaderStorageBlockBinding(GLuint program, GLuint storageBlockIndex, GLuint storageBlockBinding) {
+    if(!current_context) return;
+    if(es3_functions.glShaderStorageBlockBinding) {
+        es3_functions.glShaderStorageBlockBinding(program, storageBlockIndex, storageBlockBinding);
+    }
+}
+
+void glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format) {
+    if(!current_context) return;
+    if(es3_functions.glBindImageTexture) {
+        es3_functions.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+    }
+}
+
+void glBindBuffersBase(GLenum target, GLuint first, GLsizei count, const GLuint *buffers) {
+    if(!current_context) return;
+    if(es3_functions.glBindBuffersBase) {
+        es3_functions.glBindBuffersBase(target, first, count, buffers);
+    }
+}
+
+void glBindBuffersRange(GLenum target, GLuint first, GLsizei count, const GLuint *buffers, const GLintptr *offsets, const GLsizeiptr *sizes) {
+    if(!current_context) return;
+    if(es3_functions.glBindBuffersRange) {
+        es3_functions.glBindBuffersRange(target, first, count, buffers, offsets, sizes);
+    }
+}

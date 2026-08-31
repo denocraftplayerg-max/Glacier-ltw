@@ -44,3 +44,42 @@ void glMultiDrawElements( GLenum mode, GLsizei *count, GLenum type, const void *
     if(elementbuffer != 0) es3_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementbuffer);
 
 }
+
+/* ═══════════════════════════════════════════
+ * Emulação de MultiDrawIndirect (GLES 3.1)
+ * ═══════════════════════════════════════════ */
+
+void glMultiDrawArraysIndirect(GLenum mode, const void *indirect, GLsizei drawcount, GLsizei stride) {
+    if(!current_context) return;
+    if(!stride) stride = sizeof(GLuint) * 4; /* count, instanceCount, first, baseInstance */
+    const char* ptr = (const char*)indirect;
+    for(GLsizei i = 0; i < drawcount; i++) {
+        const GLuint* cmd = (const GLuint*)(ptr + i * stride);
+        GLuint count = cmd[0];
+        GLuint instanceCount = cmd[1];
+        GLuint first = cmd[2];
+        /* baseInstance = cmd[3] (ignorado em ES) */
+        if(count == 0) continue;
+        if(instanceCount > 1) {
+            es3_functions.glDrawArraysInstanced(mode, first, count, instanceCount);
+        } else {
+            es3_functions.glDrawArrays(mode, first, count);
+        }
+    }
+}
+
+void glMultiDrawElementsIndirect(GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride) {
+    if(!current_context) return;
+    if(!stride) stride = sizeof(GLuint) * 5; /* count, instanceCount, firstIndex, baseVertex, baseInstance */
+    const char* ptr = (const char*)indirect;
+    for(GLsizei i = 0; i < drawcount; i++) {
+        const GLuint* cmd = (const GLuint*)(ptr + i * stride);
+        GLuint count = cmd[0];
+        GLuint instanceCount = cmd[1];
+        if(count == 0) continue;
+        /* Usar glDrawElementsIndirect para cada draw individualmente.
+         * Isso é correto porque glDrawElementsIndirect processa
+         * firstIndex e baseVertex nativamente. */
+        es3_functions.glDrawElementsIndirect(mode, type, ptr + i * stride);
+    }
+}
