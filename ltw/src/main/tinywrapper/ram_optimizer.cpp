@@ -161,9 +161,9 @@ void ChunkVBOPacker::defrag() {
         if (r.offset != cursor) {
             /* Use glCopyBufferSubData for GPU-to-GPU copy (GLES 3.0+)
                This avoids CPU readback which is not available in GLES */
-            es3_functions.glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
-                                              (GLintptr)r.offset, (GLintptr)cursor,
-                                              (GLsizeiptr)r.size);
+            glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
+                                (GLintptr)r.offset, (GLintptr)cursor,
+                                (GLsizeiptr)r.size);
             r.offset = cursor;
         }
         cursor += r.size;
