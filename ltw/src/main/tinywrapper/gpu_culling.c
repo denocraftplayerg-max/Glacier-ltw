@@ -109,18 +109,18 @@ static GLuint compileComputeShader(void) {
 void gpu_culling_init(void) {
     if (gpu.initialized) return;
     
-    // Alocar SSBO de metadados (persistente, sem resize)
+    // Alocar SSBO de metadados (sem persistent mapping - não suportado em ES)
     es3_functions.glGenBuffers(1, &gpu.metadataSSBO);
     es3_functions.glBindBuffer(GL_SHADER_STORAGE_BUFFER, gpu.metadataSSBO);
     es3_functions.glBufferData(GL_SHADER_STORAGE_BUFFER, 
                                MAX_DRAWS * sizeof(DrawMetadata), 
                                NULL, GL_DYNAMIC_DRAW);
     
-    // Mapear persistente para escrita direta da CPU
+    // Mapear com flags ES3-compatíveis (sem GL_MAP_PERSISTENT_BIT/GL_MAP_COHERENT_BIT)
     gpu.metadata = (DrawMetadata*)es3_functions.glMapBufferRange(
         GL_SHADER_STORAGE_BUFFER, 0, 
         MAX_DRAWS * sizeof(DrawMetadata),
-        GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+        GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT
     );
     
     // Alocar SSBO de comando indirect
