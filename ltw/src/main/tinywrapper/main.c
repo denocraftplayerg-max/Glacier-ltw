@@ -271,6 +271,7 @@ void glBufferStorage(GLenum target,
                      GLbitfield flags) {
     if(!current_context || !current_context->buffer_storage) return;
     // Enable coherence to make sure the buffers are synced without flushing.
+    // Note: GL_MAP_PERSISTENT_BIT and GL_MAP_COHERENT_BIT are GL 4.4+ only, not available in ES
     if(never_flush_buffers && ((flags & GL_MAP_PERSISTENT_BIT) != 0)) {
         flags |= GL_MAP_COHERENT_BIT;
     }
@@ -567,16 +568,19 @@ void glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean laye
     }
 }
 
+// OpenGL 4.4+ functions - not available in ES, use loop-based fallback
 void glBindBuffersBase(GLenum target, GLuint first, GLsizei count, const GLuint *buffers) {
     if(!current_context) return;
-    if(es3_functions.glBindBuffersBase) {
-        es3_functions.glBindBuffersBase(target, first, count, buffers);
+    // Fallback: bind each buffer individually (ES compatible)
+    for(GLuint i = 0; i < (GLuint)count; i++) {
+        es3_functions.glBindBufferBase(target, first + i, buffers[i]);
     }
 }
 
 void glBindBuffersRange(GLenum target, GLuint first, GLsizei count, const GLuint *buffers, const GLintptr *offsets, const GLsizeiptr *sizes) {
     if(!current_context) return;
-    if(es3_functions.glBindBuffersRange) {
-        es3_functions.glBindBuffersRange(target, first, count, buffers, offsets, sizes);
+    // Fallback: bind each buffer individually with range (ES compatible)
+    for(GLuint i = 0; i < (GLuint)count; i++) {
+        es3_functions.glBindBufferRange(target, first + i, buffers[i], offsets[i], sizes[i]);
     }
 }
