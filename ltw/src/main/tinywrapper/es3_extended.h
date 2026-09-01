@@ -46,6 +46,4 @@ GLESFUNC(glMemoryBarrierByRegion, PFNGLMEMORYBARRIERBYREGIONPROC)
 GLESFUNC(glBindImageTexture, PFNGLBINDIMAGETEXTUREPROC)
 /* Use EXT variants for functions not available in core GLES 3.1 on Android */
 GLESFUNC(glMultiDrawArraysIndirectEXT, PFNGLMULTIDRAWARRAYSINDIRECTEXTPROC)
-GLESFUNC(glMultiDrawElementsIndirectEXT, PFNGLMULTIDRAWELEMENTSINDIRECTEXTPROC)
-/* Copy buffer operations for defragmentation */
-GLESFUNC(glCopyBufferSubData, PFNGLCOPYBUFFERSUBDATAPROC)
+/* glCopyBufferSubData and glMultiDrawElementsIndirectEXT are already in es3_functions.h */
