@@ -1,0 +1,220 @@
+=== GLACIER-LTW FASE 1: BACKUP + PATCH + DIAGNOSTICO ===
+
+  backup: ltw/src/main/tinywrapper/ltw_api.cpp
+  backup: ltw/src/main/tinywrapper/CMakeLists.txt
+  backup: ltw/src/main/tinywrapper/version.script
+  backup: src/main/resources/fabric.mod.json
+  backup: src/main/resources/glacier.mixins.json
+  backup: src/main/resources/ltw.mixins.json
+  backup: ltw/build.gradle
+  backup: build.gradle
+  backup: settings.gradle
+[OK] Backup em _backup/
+
+-- PATCH 1: extern C linkage --
+[PATCH] extern C adicionado a ltw_should_render_chunk
+-- VERIFICACAO --
+263:extern "C" {
+
+-- CMakeLists.txt --
+cmake_minimum_required(VERSION 3.10.0)
+project(LTW VERSION 1.0.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_library(ltw SHARED
+    ltw_api.cpp
+    gpu_driven.cpp
+    multi_draw_indirect.cpp
+    light_engine.cpp
+    ram_optimizer.cpp
+    foveated_renderer.cpp
+    tess_lod.cpp
+    shadow_system.cpp
+    hyengra_full_frame.cpp
+    basevertex.c
+    blending.c
+    egl.c
+    framebuffer.c
+    env.c
+    glformats.c
+    license_notice.c
+    main.c
+    multidraw.c
+    of_buffer_copier.c
+    proc.c
+    query.c
+    shader_cache.c
+    gpu_culling.c
+    jni_bridge.c
+    shader_wrapper.c
+    string_utils.c
+    stubs.c
+    swizzle.c
+    vertexattrib.c
+)
+include_directories("${CMAKE_SOURCE_DIR}")
+add_subdirectory(unordered_map)
+add_subdirectory(vgpu_shaderconv)
+add_subdirectory(glsl_optimizer)
+
+target_compile_options(ltw PRIVATE -O3 -DNDEBUG -fvisibility=hidden -ffunction-sections -fdata-sections -flto)
+target_link_options(ltw PUBLIC  -Wl,--version-script=${CMAKE_SOURCE_DIR}/version.script -ffunction-sections -fdata-sections -flto -Wl,--gc-sections)
+target_link_libraries(ltw unordered_map vgpu_shaderconv glsl_optimizer)
+if(ANDROID)
+	target_link_libraries(ltw log)
+endif()
+
+
+-- version.script --
+{
+   global: gl*; egl*;
+   local: *;
+};
+-- fabric.mod.json --
+{
+  "schemaVersion": 1,
+  "id": "ltw-gpu",
+  "version": "${version}",
+  "name": "LTW GPU Bridge + Glacier Optimizer",
+  "description": "Frustum culling + ASTC injection (LTW) + tick budget + chunk dedup + distance culling (Glacier)",
+  "authors": ["Denorium", "Glacier"],
+  "contact": { "sources": "https://github.com/denocraftplayerg-max/NVK" },
+  "license": "LGPL-3.0",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "com.glacier.Glacier"
+    ],
+    "client": [
+      "net.ltw.bridge.LTWBridgeMod",
+      "com.glacier.GlacierClient"
+    ]
+  },
+  "mixins": [
+    "ltw.mixins.json",
+    "glacier.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
+
+-- glacier.mixins.json --
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.glacier.mixin",
+  "compatibilityLevel": "JAVA_21",
+
+  "mixins": [
+    "MinecraftServerMixin"
+  ],
+
+  "client": [
+    "MinecraftMixin",
+    "LevelRendererMixin",
+    "EntityRenderDispatcherMixin"
+  ],
+
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+
+-- ltw.mixins.json --
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.ltw.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftMixin",
+    "LevelRendererMixin",
+    "FrustumMixin",
+    "GameRendererMixin",
+    "RenderSystemMixin",
+    "TextureAtlasMixin",
+    "ReloadableTextureMixin",
+    "NativeImageAccessor",
+    "SectionRenderDispatcherMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}
+
+-- ltw/build.gradle --
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace "git.artdeell.ltw"
+    compileSdk 34
+    defaultConfig {
+        minSdk 21
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    ndkVersion = "28.2.13676358"
+    externalNativeBuild {
+        cmake {
+            path file('src/main/tinywrapper/CMakeLists.txt')
+        }
+    }
+}
+
+dependencies {
+}
+
+-- build.gradle (root) --
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    id 'com.android.application' version '7.4.1' apply false
+    id 'com.android.library' version '7.4.1' apply false
+}
+// FFM API flags for Java 21
+loom {
+    runs {
+        client {
+            vmArgs "--enable-preview"
+            vmArgs "--enable-native-access=ALL-UNNAMED"
+        }
+    }
+}
+
+-- settings.gradle --
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "GL4ES-Wrapper"
+include ':ltw'
+include ':wrapper'
+
+-- contagem fontes --
+  .c:  20
+  .cpp:9
+
+=== FASE 1 COMPLETA — cole a saida acima para FASE 2 ===

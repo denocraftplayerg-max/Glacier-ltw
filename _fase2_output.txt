@@ -1,0 +1,36 @@
+=== GLACIER-LTW FASE 2: EXPORTS FFM + GRADLE FIX + CMAKE TWEAKS ===
+
+  backup: ltw/src/main/tinywrapper/version.script
+  backup: build.gradle
+  backup: ltw/src/main/tinywrapper/CMakeLists.txt
+  backup: ltw/src/main/tinywrapper/tess_lod.hpp
+[OK] Backup Fase 2 em _backup/
+
+-- PATCH 2: version.script (Exportar ltw_* para FFM) --
+[PATCH] version.script atualizado. Símbolos ltw_* agora são globais.
+{
+   global:
+       gl*;
+       egl*;
+       ltw_*;
+       HYENGRA_*;
+       Java_*;
+   local: *;
+};
+
+-- PATCH 3: build.gradle root (Neutralizar bloco loom órfão) --
+[PATCH] Bloco loom comentado no root build.gradle.
+Verificação:
+7:// [LTW-F2] loom {
+
+-- PATCH 4: CMakeLists.txt (Adicionar -fno-rtti -fno-exceptions) --
+[PATCH] CMakeLists.txt otimizado para ARM64.
+target_compile_options(ltw PRIVATE -O3 -DNDEBUG -fvisibility=hidden -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -flto)
+
+-- VERIFICACAO: Headers GLES 3.2 (Tessellation) --
+[OK] tess_lod.hpp inclui GLES3/gl32.h (GL_PATCHES disponível)
+
+=== FASE 2 COMPLETA ===
+Próximo passo: Executar o build (Gradle/CMake).
+Se o build passar, a .so terá os símbolos exportados e o FFM conseguirá linkar.
+Cole a saída do build (ou erros) para a FASE 3 (Validação de Runtime e Linkage).

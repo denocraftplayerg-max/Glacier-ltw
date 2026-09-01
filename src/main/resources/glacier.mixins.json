@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.glacier.mixin",
+  "compatibilityLevel": "JAVA_21",
+
+  "mixins": [
+    "MinecraftServerMixin"
+  ],
+
+  "client": [
+    "MinecraftMixin",
+    "LevelRendererMixin",
+    "EntityRenderDispatcherMixin"
+  ],
+
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -390,6 +390,15 @@ include $(BUILD_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := ltw
 LOCAL_SRC_FILES := \
+    ltw_api.cpp \
+    gpu_driven.cpp \
+    multi_draw_indirect.cpp \
+    light_engine.cpp \
+    ram_optimizer.cpp \
+    foveated_renderer.cpp \
+    tess_lod.cpp \
+    shadow_system.cpp \
+    hyengra_full_frame.cpp \
     egl.c \
     proc.c \
     main.c \
@@ -407,9 +416,9 @@ LOCAL_SRC_FILES := \
     swizzle.c \
     license_notice.c \
     env.c \
-shader_cache.c \
-gpu_culling.c \
-jni_bridge.c \
+    shader_cache.c \
+    gpu_culling.c \
+    jni_bridge.c \
     vgpu_shaderconv/shaderconv.c \
     unordered_map/unordered_map.c \
     unordered_map/int_hash.c

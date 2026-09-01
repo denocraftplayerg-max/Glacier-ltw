@@ -5,12 +5,9 @@
  */
 #include <GLES3/gl31.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include "proc.h"
 #include "egl.h"
 #include "main.h"
-
-#define INITIAL_INDIRECT_CAPACITY (64 * 1024) // 64 KB (~3200 indirect passes)
 
 // FFM API hook for frustum culling
 extern bool ltw_should_render_chunk(int32_t baseVertex);
@@ -22,22 +19,6 @@ typedef struct {
     GLint baseVertex;
     GLuint reservedMustBeZero;
 } indirect_pass_t;
-
-// Reusable static buffer to prevent stack VLA allocations
-static indirect_pass_t* g_static_passes = NULL;
-static size_t g_static_passes_capacity = 0;
-
-static indirect_pass_t* get_indirect_passes_buffer(size_t count) {
-    if (count > g_static_passes_capacity) {
-        size_t new_cap = count * 2;
-        if (new_cap < 1024) new_cap = 1024;
-        indirect_pass_t* new_buf = (indirect_pass_t*)realloc(g_static_passes, new_cap * sizeof(indirect_pass_t));
-        if (!new_buf) return g_static_passes;
-        g_static_passes = new_buf;
-        g_static_passes_capacity = new_cap;
-    }
-    return g_static_passes;
-}
 
 void basevertex_init(context_t* context) {
     basevertex_renderer_t *renderer = &context->basevertex;
@@ -55,13 +36,6 @@ void basevertex_init(context_t* context) {
         printf("LTW: Failed to initialize indirect buffers: %x\n", error);
         return;
     }
-
-    // Preallocate GPU indirect buffer to avoid reallocations on draw
-    es3_functions.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, renderer->indirectRenderBuffer);
-    es3_functions.glBufferData(GL_DRAW_INDIRECT_BUFFER, INITIAL_INDIRECT_CAPACITY, NULL, GL_DYNAMIC_DRAW);
-    renderer->bufferCapacity = INITIAL_INDIRECT_CAPACITY;
-    es3_functions.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
     renderer->ready = true;
 }
 
@@ -74,7 +48,7 @@ GLint type_bytes(GLenum type) {
     }
 }
 
-static inline void restore_state(GLuint element_buffer) {
+static void restore_state(GLuint element_buffer) {
     es3_functions.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, current_context->bound_buffers[get_buffer_index(GL_DRAW_INDIRECT_BUFFER)]);
 }
 
@@ -110,9 +84,8 @@ void glDrawElementsBaseVertex(GLenum mode, GLsizei count, GLenum type, const voi
     indirect_pass.baseVertex = basevertex;
     indirect_pass.instanceCount = 1;
     indirect_pass.reservedMustBeZero = 0;
-
     es3_functions.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, renderer->indirectRenderBuffer);
-    es3_functions.glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(indirect_pass_t), &indirect_pass);
+    es3_functions.glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirect_pass_t), &indirect_pass, GL_STREAM_DRAW);
     es3_functions.glDrawElementsIndirect(mode, type, 0);
     restore_state(elementbuffer);
 }
@@ -123,9 +96,20 @@ void glMultiDrawElementsBaseVertex(GLenum mode,
                                    const void * const *indices,
                                    GLsizei drawcount,
                                    const GLint *basevertex) {
-    if(!current_context || drawcount <= 0) return;
+    if(!current_context) return;
     
-    // Fast path: host driver support
+    // FRUSTUM CULLING HOOK: Filter out chunks outside frustum
+    GLsizei filtered_count = 0;
+    for (GLsizei i = 0; i < drawcount; i++) {
+        if (ltw_should_render_chunk(basevertex[i])) {
+            filtered_count++;
+        }
+    }
+    
+    if (filtered_count == 0) {
+        return; // All chunks culled
+    }
+    
     if(current_context->drawelementsbasevertex != NULL) {
         for(GLsizei i = 0; i < drawcount; i++) {
             if (ltw_should_render_chunk(basevertex[i])) {
@@ -134,15 +118,22 @@ void glMultiDrawElementsBaseVertex(GLenum mode,
         }
         return;
     }
-
     basevertex_renderer_t *renderer = &current_context->basevertex;
     if(!renderer->ready) return;
-
+    GLint elementbuffer;
+    es3_functions.glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementbuffer);
+    if(elementbuffer == 0) {
+        printf("LTW: Base vertex draws without element buffer are not supported\n");
+        return;
+    }
     GLint typeBytes = type_bytes(type);
-    indirect_pass_t* indirect_passes = get_indirect_passes_buffer((size_t)drawcount);
-    if(!indirect_passes) return;
-
-    GLsizei filtered_count = 0;
+    
+    // Allocate filtered arrays
+    indirect_pass_t indirect_passes[filtered_count];
+    GLsizei filtered_indices[filtered_count];
+    GLsizei filtered_basevertex[filtered_count];
+    
+    GLsizei j = 0;
     for(GLsizei i = 0; i < drawcount; i++) {
         if (!ltw_should_render_chunk(basevertex[i])) {
             continue; // Skip culled chunks
@@ -153,38 +144,20 @@ void glMultiDrawElementsBaseVertex(GLenum mode,
             printf("LTW: misaligned base vertex draw not supported (draw %i)\n", i);
             return;
         }
-        indirect_pass_t* pass = &indirect_passes[filtered_count];
+        indirect_pass_t* pass = &indirect_passes[j];
         pass->count = count[i];
         pass->firstIndex = indicesPointer / typeBytes;
         pass->baseVertex = basevertex[i];
         pass->instanceCount = 1;
         pass->reservedMustBeZero = 0;
-        filtered_count++;
+        
+        filtered_indices[j] = i;
+        filtered_basevertex[j] = basevertex[i];
+        j++;
     }
     
-    if (filtered_count == 0) {
-        return; // All chunks culled
-    }
-
-    GLint elementbuffer;
-    es3_functions.glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementbuffer);
-    if(elementbuffer == 0) {
-        printf("LTW: Base vertex draws without element buffer are not supported\n");
-        return;
-    }
-
-    GLsizeiptr required_bytes = (GLsizeiptr)(sizeof(indirect_pass_t) * filtered_count);
     es3_functions.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, renderer->indirectRenderBuffer);
-    
-    // Resize GPU buffer only if required, otherwise stream via SubData
-    if (required_bytes > renderer->bufferCapacity) {
-        GLsizeiptr new_cap = required_bytes * 2;
-        es3_functions.glBufferData(GL_DRAW_INDIRECT_BUFFER, new_cap, indirect_passes, GL_DYNAMIC_DRAW);
-        renderer->bufferCapacity = new_cap;
-    } else {
-        es3_functions.glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, required_bytes, indirect_passes);
-    }
-
+    es3_functions.glBufferData(GL_DRAW_INDIRECT_BUFFER, (long)sizeof(indirect_pass_t) * filtered_count, indirect_passes, GL_STREAM_DRAW);
     if(current_context->multidraw_indirect) {
         es3_functions.glMultiDrawElementsIndirectEXT(mode, type, 0, filtered_count, 0);
     } else {
@@ -194,4 +167,3 @@ void glMultiDrawElementsBaseVertex(GLenum mode,
     }
     restore_state(elementbuffer);
 }
-

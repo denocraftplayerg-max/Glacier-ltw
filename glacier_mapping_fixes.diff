@@ -1,0 +1,9 @@
+# GLACIER MAPPING RESOLVER PATCH
+# Este arquivo NÃO foi aplicado automaticamente.
+
+--- ./src/main/java/net/ltw/mixin/SectionRenderDispatcherMixin.java
++++ ./src/main/java/net/ltw/mixin/SectionRenderDispatcherMixin.java
+@@ line 12 @@
+-@Mixin(SectionRenderDispatcher.RenderSection.class)
++@Mixin(net.minecraft.client.renderer.chunk.SectionRenderDispatcher$RenderSection.class)
+

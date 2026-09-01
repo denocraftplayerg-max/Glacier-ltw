@@ -1,4 +1,9 @@
 {
-   global: gl*; egl*;
+   global:
+       gl*;
+       egl*;
+       ltw_*;
+       HYENGRA_*;
+       Java_*;
    local: *;
 };

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "ltw-gpu",
+  "version": "${version}",
+  "name": "LTW GPU Bridge + Glacier Optimizer",
+  "description": "Frustum culling + ASTC injection (LTW) + tick budget + chunk dedup + distance culling (Glacier)",
+  "authors": ["Denorium", "Glacier"],
+  "contact": { "sources": "https://github.com/denocraftplayerg-max/NVK" },
+  "license": "LGPL-3.0",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "com.glacier.Glacier"
+    ],
+    "client": [
+      "net.ltw.bridge.LTWBridgeMod",
+      "com.glacier.GlacierClient"
+    ]
+  },
+  "mixins": [
+    "ltw.mixins.json",
+    "glacier.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}

@@ -4,11 +4,11 @@ plugins {
     id 'com.android.library' version '7.4.1' apply false
 }
 // FFM API flags for Java 21
-// [LTW-F2] loom {
-// [LTW-F2]     runs {
-// [LTW-F2]         client {
-// [LTW-F2]             vmArgs "--enable-preview"
-// [LTW-F2]             vmArgs "--enable-native-access=ALL-UNNAMED"
-// [LTW-F2]         }
-// [LTW-F2]     }
-// [LTW-F2] }
+loom {
+    runs {
+        client {
+            vmArgs "--enable-preview"
+            vmArgs "--enable-native-access=ALL-UNNAMED"
+        }
+    }
+}

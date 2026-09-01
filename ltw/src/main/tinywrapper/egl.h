@@ -22,6 +22,7 @@
 typedef struct {
     bool ready;
     GLuint indirectRenderBuffer;
+    GLsizeiptr bufferCapacity;
 } basevertex_renderer_t;
 
 typedef struct {

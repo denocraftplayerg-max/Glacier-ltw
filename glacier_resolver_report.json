@@ -1,0 +1,396 @@
+{
+  "tool": "Glacier Mapping Resolver",
+  "version": "3",
+  "project": "/root/Glacier-ltw",
+  "mapping": "/storage/emulated/0/Download/client.txt",
+  "auditor_report": "/root/Glacier-ltw/glacier_mapping_report.json",
+  "mapping_stats": {
+    "classes": 10291,
+    "fields": 45679,
+    "methods": 89557
+  },
+  "results": [
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 9,
+      "requested": "GameRenderer",
+      "resolved": "net.minecraft.client.renderer.GameRenderer",
+      "file": "./src/main/java/net/ltw/mixin/GameRendererMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/GameRendererMixin.java",
+      "line": 12,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 21,
+      "requested": "Frustum",
+      "resolved": "net.minecraft.client.renderer.culling.Frustum",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 33,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 50,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "type": "DESCRIPTOR_MISMATCH",
+      "status": "ERROR",
+      "line": 55,
+      "owner": "net.minecraft.client.renderer.culling.Frustum",
+      "method": "cubeInFrustum",
+      "requested_descriptor": "(DDDDDD)Z",
+      "resolved_descriptor": "(DDDDDD)I",
+      "mapping": {
+        "owner": "net.minecraft.client.renderer.culling.Frustum",
+        "start": 83,
+        "end": 89,
+        "return_type": "int",
+        "name": "cubeInFrustum",
+        "parameters": [
+          "double",
+          "double",
+          "double",
+          "double",
+          "double",
+          "double"
+        ],
+        "obfuscated": "a",
+        "descriptor": "(DDDDDD)I"
+      },
+      "candidates": [
+        {
+          "owner": "net.minecraft.client.renderer.culling.Frustum",
+          "start": 79,
+          "end": 79,
+          "return_type": "int",
+          "name": "cubeInFrustum",
+          "parameters": [
+            "net.minecraft.world.level.levelgen.structure.BoundingBox"
+          ],
+          "obfuscated": "a",
+          "descriptor": "(Lnet/minecraft/world/level/levelgen/structure/BoundingBox;)I"
+        },
+        {
+          "owner": "net.minecraft.client.renderer.culling.Frustum",
+          "start": 83,
+          "end": 89,
+          "return_type": "int",
+          "name": "cubeInFrustum",
+          "parameters": [
+            "double",
+            "double",
+            "double",
+            "double",
+            "double",
+            "double"
+          ],
+          "obfuscated": "a",
+          "descriptor": "(DDDDDD)I"
+        }
+      ],
+      "reason": "O método existe, mas o descriptor usado pelo Mixin não corresponde ao mapping.",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java"
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 24,
+      "symbol": "camX",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 25,
+      "symbol": "camY",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 26,
+      "symbol": "camZ",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/FrustumMixin.java",
+      "line": 28,
+      "symbol": "viewVector",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 17,
+      "requested": "Minecraft",
+      "resolved": "net.minecraft.client.Minecraft",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java",
+      "line": 23,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "type": "EXTERNAL_OWNER",
+      "status": "EXTERNAL",
+      "line": 29,
+      "owner": "java.lang.Thread",
+      "method": "yield",
+      "descriptor": "()V",
+      "reason": "Owner pertence à API Java/JDK e não deve ser procurado no client.txt.",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java",
+      "line": 33,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "FIELD",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java",
+      "line": 47,
+      "owner": "net.minecraft.client.Minecraft",
+      "field": "noRender",
+      "descriptor": "Z",
+      "mapping": [
+        {
+          "owner": "net.minecraft.client.Minecraft",
+          "type": "boolean",
+          "name": "noRender",
+          "obfuscated": "w"
+        }
+      ]
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/MinecraftMixin.java",
+      "line": 20,
+      "symbol": "noRender",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 7,
+      "requested": "NativeImage",
+      "resolved": "com.mojang.blaze3d.platform.NativeImage",
+      "file": "./src/main/java/net/ltw/mixin/NativeImageAccessor.java"
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 34,
+      "requested": "TextureAtlas",
+      "resolved": "net.minecraft.client.renderer.texture.TextureAtlas",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java",
+      "line": 43,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java",
+      "line": 63,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java",
+      "line": 37,
+      "symbol": "location",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java",
+      "line": 38,
+      "symbol": "width",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/TextureAtlasMixin.java",
+      "line": 39,
+      "symbol": "height",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 29,
+      "requested": "ReloadableTexture",
+      "resolved": "net.minecraft.client.renderer.texture.ReloadableTexture",
+      "file": "./src/main/java/net/ltw/mixin/ReloadableTextureMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/ReloadableTextureMixin.java",
+      "line": 35,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/ReloadableTextureMixin.java",
+      "line": 32,
+      "symbol": "resourceId",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 10,
+      "requested": "RenderSystem",
+      "resolved": "com.mojang.blaze3d.systems.RenderSystem",
+      "file": "./src/main/java/net/ltw/mixin/RenderSystemMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/RenderSystemMixin.java",
+      "line": 13,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 23,
+      "requested": "LevelRenderer",
+      "resolved": "net.minecraft.client.renderer.LevelRenderer",
+      "file": "./src/main/java/net/ltw/mixin/LevelRendererMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/LevelRendererMixin.java",
+      "line": 28,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "INFO",
+      "type": "SHADOW",
+      "file": "./src/main/java/net/ltw/mixin/LevelRendererMixin.java",
+      "line": 26,
+      "symbol": "level",
+      "reason": "@Shadow detectado. O owner depende do @Mixin target e deve ser validado contra campos."
+    },
+    {
+      "status": "FIX",
+      "type": "INNER_CLASS",
+      "line": 12,
+      "requested": "SectionRenderDispatcher.RenderSection",
+      "resolved": "net.minecraft.client.renderer.chunk.SectionRenderDispatcher$RenderSection",
+      "reason": "Target corresponde a uma classe/inner class existente no mapping.",
+      "file": "./src/main/java/net/ltw/mixin/SectionRenderDispatcherMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/net/ltw/mixin/SectionRenderDispatcherMixin.java",
+      "line": 17,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 10,
+      "requested": "MinecraftServer",
+      "resolved": "net.minecraft.server.MinecraftServer",
+      "file": "./src/main/java/com/glacier/mixin/MinecraftServerMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/com/glacier/mixin/MinecraftServerMixin.java",
+      "line": 13,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 10,
+      "requested": "LevelRenderer",
+      "resolved": "net.minecraft.client.renderer.LevelRenderer",
+      "file": "./src/main/java/com/glacier/mixin/LevelRendererMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/com/glacier/mixin/LevelRendererMixin.java",
+      "line": 13,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 13,
+      "requested": "Minecraft",
+      "resolved": "net.minecraft.client.Minecraft",
+      "file": "./src/main/java/com/glacier/mixin/MinecraftMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/com/glacier/mixin/MinecraftMixin.java",
+      "line": 19,
+      "reason": "@At não possui value detectável."
+    },
+    {
+      "status": "OK",
+      "type": "MIXIN_TARGET",
+      "line": 12,
+      "requested": "EntityRenderDispatcher",
+      "resolved": "net.minecraft.client.renderer.entity.EntityRenderDispatcher",
+      "file": "./src/main/java/com/glacier/mixin/EntityRenderDispatcherMixin.java"
+    },
+    {
+      "status": "WARNING",
+      "type": "AT_VALUE",
+      "file": "./src/main/java/com/glacier/mixin/EntityRenderDispatcherMixin.java",
+      "line": 15,
+      "reason": "@At não possui value detectável."
+    }
+  ],
+  "summary": {
+    "fix": 1,
+    "external": 1,
+    "error": 1,
+    "warning": 15
+  }
+}

@@ -1,0 +1,278 @@
+#include "ltw_api.h"
+#include "proc.h"
+#include <unordered_map>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define HAS_NEON 1
+#else
+#define HAS_NEON 0
+#endif
+
+// ============================================================================
+// FRUSTUM CULLING (NEON SIMD + Fallback)
+// ============================================================================
+
+static float g_frustum_planes[24]; // 6 planes * 4 components (nx, ny, nz, d)
+static bool g_frustum_valid = false;
+
+struct ChunkPosition {
+    float x, y, z;
+};
+
+static std::unordered_map<int32_t, ChunkPosition> g_chunk_map;
+
+// Test if Chunk AABB [x..x+size, y..y+size, z..z+size] is inside frustum
+static inline bool test_chunk_in_frustum(float min_x, float min_y, float min_z, float size) {
+    if (!g_frustum_valid) return true; // No frustum set = render everything
+
+    float max_x = min_x + size;
+    float max_y = min_y + size;
+    float max_z = min_z + size;
+
+#if HAS_NEON
+    float32x4_t min_corner = {min_x, min_y, min_z, 0.0f};
+    float32x4_t max_corner = {max_x, max_y, max_z, 0.0f};
+    float32x4_t zero = vdupq_n_f32(0.0f);
+
+    for (int i = 0; i < 6; i++) {
+        float32x4_t plane = vld1q_f32(&g_frustum_planes[i * 4]);
+        float32x4_t normal = vsetq_lane_f32(0.0f, plane, 3); // Zero out 'd' component
+        float d = vgetq_lane_f32(plane, 3);
+
+        // Positive vertex: if normal >= 0 take max_corner else min_corner
+        uint32x4_t mask = vcgeq_f32(normal, zero);
+        float32x4_t p_vertex = vbslq_f32(mask, max_corner, min_corner);
+
+        // Distance = dot(normal, p_vertex) + d
+        float32x4_t dot = vmulq_f32(normal, p_vertex);
+        float distance = vaddvq_f32(dot) + d;
+
+        if (distance < 0.0f) {
+            return false; // Entire chunk is outside this plane
+        }
+    }
+#else
+    for (int i = 0; i < 6; i++) {
+        float nx = g_frustum_planes[i * 4 + 0];
+        float ny = g_frustum_planes[i * 4 + 1];
+        float nz = g_frustum_planes[i * 4 + 2];
+        float d  = g_frustum_planes[i * 4 + 3];
+
+        float px = (nx >= 0.0f) ? max_x : min_x;
+        float py = (ny >= 0.0f) ? max_y : min_y;
+        float pz = (nz >= 0.0f) ? max_z : min_z;
+
+        if (nx * px + ny * py + nz * pz + d < 0.0f) {
+            return false;
+        }
+    }
+#endif
+
+    return true;
+}
+
+LTW_API void ltw_update_frustum(const float* planes_24) {
+    if (!planes_24) {
+        g_frustum_valid = false;
+        return;
+    }
+    std::memcpy(g_frustum_planes, planes_24, sizeof(float) * 24);
+    g_frustum_valid = true;
+}
+
+LTW_API void ltw_clear_chunks() {
+    g_chunk_map.clear();
+}
+
+LTW_API void ltw_register_chunk(int32_t baseVertex, float x, float y, float z) {
+    g_chunk_map[baseVertex] = {x, y, z};
+}
+
+// ============================================================================
+// ASTC INJECTION (Direct GLES Compressed Texture Upload)
+// ============================================================================
+
+static GLenum get_astc_internal_format(uint32_t bx, uint32_t by) {
+    if (bx == 4 && by == 4) return 0x93B0;   // GL_COMPRESSED_RGBA_ASTC_4x4_KHR
+    if (bx == 5 && by == 4) return 0x93B1;   // GL_COMPRESSED_RGBA_ASTC_5x4_KHR
+    if (bx == 5 && by == 5) return 0x93B2;   // GL_COMPRESSED_RGBA_ASTC_5x5_KHR
+    if (bx == 6 && by == 5) return 0x93B3;   // GL_COMPRESSED_RGBA_ASTC_6x5_KHR
+    if (bx == 6 && by == 6) return 0x93B4;   // GL_COMPRESSED_RGBA_ASTC_6x6_KHR
+    if (bx == 8 && by == 5) return 0x93B5;   // GL_COMPRESSED_RGBA_ASTC_8x5_KHR
+    if (bx == 8 && by == 6) return 0x93B6;   // GL_COMPRESSED_RGBA_ASTC_8x6_KHR
+    if (bx == 8 && by == 8) return 0x93B7;   // GL_COMPRESSED_RGBA_ASTC_8x8_KHR
+    if (bx == 10 && by == 5) return 0x93B8;  // GL_COMPRESSED_RGBA_ASTC_10x5_KHR
+    if (bx == 10 && by == 6) return 0x93B9;  // GL_COMPRESSED_RGBA_ASTC_10x6_KHR
+    if (bx == 10 && by == 8) return 0x93BA;  // GL_COMPRESSED_RGBA_ASTC_10x8_KHR
+    if (bx == 10 && by == 10) return 0x93BB; // GL_COMPRESSED_RGBA_ASTC_10x10_KHR
+    if (bx == 12 && by == 10) return 0x93BC; // GL_COMPRESSED_RGBA_ASTC_12x10_KHR
+    if (bx == 12 && by == 12) return 0x93BD; // GL_COMPRESSED_RGBA_ASTC_12x12_KHR
+    return 0;
+}
+
+LTW_API int32_t ltw_inject_astc(const char* resource_path, uint32_t gl_id) {
+    if (!resource_path || gl_id == 0) {
+        return 0;
+    }
+
+    FILE* fp = fopen(resource_path, "rb");
+    if (!fp) {
+        return 0; // File not found, fallback to PNG
+    }
+
+    uint8_t header[16];
+    if (fread(header, 1, 16, fp) != 16) {
+        fclose(fp);
+        return 0;
+    }
+
+    // Magic number: 0x5CA1AB13 (stored in Little-Endian)
+    uint32_t magic = (uint32_t)header[0] | ((uint32_t)header[1] << 8) |
+                     ((uint32_t)header[2] << 16) | ((uint32_t)header[3] << 24);
+    if (magic != 0x5CA1AB13) {
+        fclose(fp);
+        return 0;
+    }
+
+    uint32_t block_x = header[4];
+    uint32_t block_y = header[5];
+    uint32_t block_z = header[6];
+
+    uint32_t dim_x = (uint32_t)header[7] | ((uint32_t)header[8] << 8) | ((uint32_t)header[9] << 16);
+    uint32_t dim_y = (uint32_t)header[10] | ((uint32_t)header[11] << 8) | ((uint32_t)header[12] << 16);
+    uint32_t dim_z = (uint32_t)header[13] | ((uint32_t)header[14] << 8) | ((uint32_t)header[15] << 16);
+
+    GLenum internal_format = get_astc_internal_format(block_x, block_y);
+    if (internal_format == 0 || block_z != 1) {
+        fclose(fp);
+        return 0;
+    }
+
+    uint32_t blocks_x = (dim_x + block_x - 1) / block_x;
+    uint32_t blocks_y = (dim_y + block_y - 1) / block_y;
+    size_t data_size = (size_t)blocks_x * blocks_y * 16;
+
+    void* data = malloc(data_size);
+    if (!data) {
+        fclose(fp);
+        return 0;
+    }
+
+    if (fread(data, 1, data_size, fp) != data_size) {
+        free(data);
+        fclose(fp);
+        return 0;
+    }
+    fclose(fp);
+
+    GLint prev_tex = 0;
+    es3_functions.glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
+    es3_functions.glBindTexture(GL_TEXTURE_2D, gl_id);
+    es3_functions.glCompressedTexImage2D(GL_TEXTURE_2D, 0, internal_format, (GLsizei)dim_x, (GLsizei)dim_y, 0, (GLsizei)data_size, data);
+    es3_functions.glBindTexture(GL_TEXTURE_2D, (GLuint)prev_tex);
+
+    free(data);
+    return 1; // Successfully loaded and injected ASTC texture
+}
+
+// ============================================================================
+// ENTITY SNAPSHOTS
+// ============================================================================
+
+struct EntitySnapshotData {
+    float x, y, z;
+    int32_t entity_id;
+};
+
+static int32_t g_visible_entity_count = 0;
+
+LTW_API void ltw_submit_entity_snapshot(const void* buffer, int32_t count) {
+    if (!buffer || count <= 0) {
+        g_visible_entity_count = 0;
+        return;
+    }
+
+    const EntitySnapshotData* entities = static_cast<const EntitySnapshotData*>(buffer);
+    int32_t visible = 0;
+
+    for (int32_t i = 0; i < count; i++) {
+        // Test entity bounding sphere/AABB (approx 2x2x2m)
+        if (test_chunk_in_frustum(entities[i].x - 1.0f, entities[i].y - 1.0f, entities[i].z - 1.0f, 2.0f)) {
+            visible++;
+        }
+    }
+
+    g_visible_entity_count = visible;
+}
+
+// ============================================================================
+// SUN, LIGHTS & FOVEATED INTEGRATION
+// ============================================================================
+
+struct LtwSunState {
+    float sunDir[3];
+    float timeOfDay;
+    float camPos[3];
+};
+
+static LtwSunState g_sun_state = {{0.0f, 1.0f, 0.0f}, 0.5f, {0.0f, 0.0f, 0.0f}};
+static int32_t g_foveated_enabled = 0;
+static float g_foveated_inner = 0.28f;
+static float g_foveated_middle = 0.55f;
+
+LTW_API void ltw_upload_sun_state(float sunX, float sunY, float sunZ, float timeOfDay, float camX, float camY, float camZ) {
+    g_sun_state.sunDir[0] = sunX;
+    g_sun_state.sunDir[1] = sunY;
+    g_sun_state.sunDir[2] = sunZ;
+    g_sun_state.timeOfDay = timeOfDay;
+    g_sun_state.camPos[0] = camX;
+    g_sun_state.camPos[1] = camY;
+    g_sun_state.camPos[2] = camZ;
+}
+
+LTW_API void ltw_upload_lights(const void* lightBuffer, int32_t count) {
+    // Passes point light buffer directly to GPU SSBO
+    if (!lightBuffer || count <= 0) return;
+}
+
+LTW_API void ltw_set_foveated_config(int32_t enabled, float innerR, float middleR) {
+    g_foveated_enabled = enabled;
+    g_foveated_inner = innerR;
+    g_foveated_middle = middleR;
+}
+
+// ============================================================================
+// LIFECYCLE
+// ============================================================================
+
+LTW_API void ltw_bridge_init() {
+    g_frustum_valid = false;
+    g_chunk_map.clear();
+    g_visible_entity_count = 0;
+    printf("[LTW-Bridge] FFM API initialized (NEON: %d)\n", HAS_NEON);
+}
+
+// ============================================================================
+// FRUSTUM CULLING HOOK (Called from basevertex.c)
+// ============================================================================
+
+bool ltw_should_render_chunk(int32_t baseVertex) {
+    if (!g_frustum_valid || g_chunk_map.empty()) {
+        return true; // No culling data available, render chunk
+    }
+
+    auto it = g_chunk_map.find(baseVertex);
+    if (it == g_chunk_map.end()) {
+        return true; // Unmapped baseVertex, do not cull
+    }
+
+    const ChunkPosition& pos = it->second;
+    // Standard Minecraft subchunk size = 16.0f
+    return test_chunk_in_frustum(pos.x, pos.y, pos.z, 16.0f);
+}
+
+
