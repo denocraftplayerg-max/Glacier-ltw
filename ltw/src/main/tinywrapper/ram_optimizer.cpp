@@ -10,7 +10,7 @@
 #define LOG(...) printf(__VA_ARGS__)
 #endif
 
-// ── BufferPool ───────────────────────────────────────────────────────────────
+// ── BufferPool ──────────────────────────────────────────────────────────
 GLuint BufferPool::acquire(size_t size, GLenum target) {
     for (auto& e : pool) {
         if (!e.inUse && e.size >= size) {
@@ -75,7 +75,7 @@ void ChunkStreamBuffer::destroy() {
     glDeleteBuffers(BUFFER_COUNT, buffers);
 }
 
-// ── TextureCache LRU ─────────────────────────────────────────────────────────
+// ── TextureCache LRU ────────────────────────────────────────────────────────
 void TextureCache::init(size_t budget) {
     budgetBytes = budget;
 }
@@ -117,7 +117,7 @@ void TextureCache::destroyAll() {
     cache.clear(); usedBytes = 0;
 }
 
-// ── ChunkVBOPacker ───────────────────────────────────────────────────────────
+// ── ChunkVBOPacker ────────────────────────────────────────────────────────
 void ChunkVBOPacker::init(size_t vboSize) {
     _totalSize = vboSize;
     glGenBuffers(1, &_vbo);
@@ -155,19 +155,21 @@ void ChunkVBOPacker::free(int chunkId) {
 
 void ChunkVBOPacker::defrag() {
     size_t cursor = 0;
-    glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+    glBindBuffer(GL_COPY_READ_BUFFER, _vbo);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _vbo);
     for (auto& r : regions) {
         if (r.offset != cursor) {
-            std::vector<uint8_t> tmp(r.size);
-            glGetBufferSubData(GL_ARRAY_BUFFER, (GLintptr)r.offset,
-                               (GLsizeiptr)r.size, tmp.data());
-            glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)cursor,
-                            (GLsizeiptr)r.size, tmp.data());
+            /* Use glCopyBufferSubData for GPU-to-GPU copy (GLES 3.0+)
+               This avoids CPU readback which is not available in GLES */
+            es3_functions.glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
+                                              (GLintptr)r.offset, (GLintptr)cursor,
+                                              (GLsizeiptr)r.size);
             r.offset = cursor;
         }
         cursor += r.size;
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 }
 
 void ChunkVBOPacker::destroy() {
