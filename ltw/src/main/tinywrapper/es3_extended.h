@@ -39,11 +39,6 @@ GLESFUNC(glGetQueryObjectui64vEXT, PFNGLGETQUERYOBJECTUI64VEXTPROC)
 GLESFUNC(glQueryCounterEXT, PFNGLQUERYCOUNTEREXTPROC)
 
 /* GLES 3.1+ - Compute Shader e relacionados */
-GLESFUNC(glDispatchCompute, PFNGLDISPATCHCOMPUTEPROC)
-GLESFUNC(glDispatchComputeIndirect, PFNGLDISPATCHCOMPUTEINDIRECTPROC)
-GLESFUNC(glMemoryBarrier, PFNGLMEMORYBARRIERPROC)
-GLESFUNC(glMemoryBarrierByRegion, PFNGLMEMORYBARRIERBYREGIONPROC)
-GLESFUNC(glBindImageTexture, PFNGLBINDIMAGETEXTUREPROC)
 /* Use EXT variants for functions not available in core GLES 3.1 on Android */
 GLESFUNC(glMultiDrawArraysIndirectEXT, PFNGLMULTIDRAWARRAYSINDIRECTEXTPROC)
 /* glCopyBufferSubData and glMultiDrawElementsIndirectEXT are already in es3_functions.h */

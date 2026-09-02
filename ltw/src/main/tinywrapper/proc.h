@@ -8,6 +8,17 @@
 #define POJAVLAUNCHER_PROC_H
 
 #include <GLES3/gl32.h>
+#ifndef LTW_PFNGLSHADERSTORAGEBLOCKBINDINGPROC_COMPAT
+#define LTW_PFNGLSHADERSTORAGEBLOCKBINDINGPROC_COMPAT
+#ifndef PFNGLSHADERSTORAGEBLOCKBINDINGPROC
+typedef void (GL_APIENTRYP PFNGLSHADERSTORAGEBLOCKBINDINGPROC)(
+    GLuint program,
+    GLuint storageBlockIndex,
+    GLuint storageBlockBinding
+);
+#endif
+#endif
+
 #include <GLES2/gl2ext.h>
 #include <threads.h>
 
