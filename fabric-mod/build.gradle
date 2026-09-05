@@ -12,6 +12,8 @@ repositories {
 }
 
 loom {
+    accessWidenerPath = file("src/main/resources/glacier-ltw.accesswidener")
+
     runs {
         client {
             vmArgs "--enable-preview", "--enable-native-access=ALL-UNNAMED"

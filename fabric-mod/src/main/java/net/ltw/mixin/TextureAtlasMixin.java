@@ -117,9 +117,14 @@ public abstract class TextureAtlasMixin extends AbstractTexture {
         GL30.glDeleteFramebuffers(fbo);
         MemoryUtil.memFree(rawBuffer);
 
-        image.writeToFile(capturePath);
-        image.close();
-        System.out.println("[LTW-Bridge] Captured: " + atlasName + " (" + w + "x" + h + ") -> " + capturePath);
+        try {
+            image.writeToFile(capturePath);
+            System.out.println("[LTW-Bridge] Captured: " + atlasName + " (" + w + "x" + h + ") -> " + capturePath);
+        } catch (java.io.IOException e) {
+            System.err.println("[LTW-Bridge] Failed to write captured atlas: " + e.getMessage());
+        } finally {
+            image.close();
+        }
     }
 
     @Unique
