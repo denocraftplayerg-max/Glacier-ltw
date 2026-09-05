@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
     id 'maven-publish'
 }
 
@@ -9,6 +9,17 @@ base {
 
 repositories {
     mavenCentral()
+}
+
+loom {
+    runs {
+        client {
+            vmArgs "--enable-preview", "--enable-native-access=ALL-UNNAMED"
+        }
+        server {
+            vmArgs "--enable-preview", "--enable-native-access=ALL-UNNAMED"
+        }
+    }
 }
 
 dependencies {
@@ -28,6 +39,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
+    it.options.compilerArgs << "--enable-preview"
 }
 
 java {
@@ -37,7 +49,18 @@ java {
 }
 
 jar {
+    def projectName = project.name
+    inputs.property "projectName", projectName
     from("LICENSE") {
-        rename { "${it}_${project.base.archivesName.get()}" }
+        rename { "${it}_${projectName}" }
     }
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            from components.java
+        }
+    }
+    repositories { }
 }
