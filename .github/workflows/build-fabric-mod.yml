@@ -27,14 +27,12 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./fabric-mod/gradlew
+        with:
+          gradle-version: '8.11.1'
 
       - name: Build mod
-        run: |
-          cd fabric-mod
-          ./gradlew build --no-daemon
+        working-directory: fabric-mod
+        run: gradle build --no-daemon --stacktrace
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
