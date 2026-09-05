@@ -22,9 +22,9 @@ public abstract class MinecraftMixin {
         GameRenderer gameRenderer = minecraft.gameRenderer;
         if (gameRenderer == null) return;
         Camera camera = gameRenderer.getMainCamera();
-        var position = camera.getPosition();
+        var position = camera.position();
         glacier$frame.begin(
                 position.x, position.y, position.z,
-                camera.getYRot(), camera.getXRot());
+                camera.yRot(), camera.xRot());
     }
 }

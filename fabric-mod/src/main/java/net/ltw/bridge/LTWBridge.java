@@ -217,7 +217,7 @@ public final class LTWBridge {
         if (!available || resourcePath == null) return false;
         
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment cString = arena.allocateFrom(resourcePath);
+            MemorySegment cString = arena.allocateUtf8String(resourcePath);
             int result = (int) MH_INJECT_ASTC.invokeExact(cString, glId);
             return result == 1;
         } catch (Throwable t) {

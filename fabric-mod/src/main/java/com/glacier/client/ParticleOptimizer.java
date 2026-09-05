@@ -13,9 +13,9 @@ public final class ParticleOptimizer {
 
     public static boolean withinDistance(Particle particle,
             double cameraX, double cameraY, double cameraZ) {
-        double dx = particle.getX() - cameraX;
-        double dy = particle.getY() - cameraY;
-        double dz = particle.getZ() - cameraZ;
+        double dx = particle.x - cameraX;
+        double dy = particle.y - cameraY;
+        double dz = particle.z - cameraZ;
         return dx * dx + dy * dy + dz * dz <= MAX_DISTANCE_SQ;
     }
 }

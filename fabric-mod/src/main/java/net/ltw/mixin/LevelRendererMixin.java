@@ -46,9 +46,9 @@ public class LevelRendererMixin {
         LTWBridge.clearChunkPositions();
 
         if (camera != null) {
-            var pos = camera.getPosition();
+            var pos = camera.position();
             float partialTick = deltaTracker.getGameTimeDeltaPartialTick(true);
-            float timeOfDay = (this.level != null) ? this.level.getTimeOfDay(partialTick) : 0.5f;
+            float timeOfDay = (this.level != null) ? ((float)(this.level.getDayTime() % 24000L) + partialTick) / 24000.0f : 0.5f;
             float sunAngle = timeOfDay * ((float) Math.PI * 2.0F);
             float sunX = -(float) Math.sin(sunAngle);
             float sunY = (float) Math.cos(sunAngle);
